@@ -3,9 +3,10 @@ const TOLERANCE: f32 = 0.05;
 
 
 pub fn images_match(
-    screen: ImageView,
-    sample: ImageView,
-    coords: (usize, usize)
+    screen: &ImageView,
+    sample: &ImageView,
+    start_x: usize,
+    start_y: usize,
 ) -> bool {
     assert_eq!(screen.channels, sample.channels);
     let channels = screen.channels;
@@ -19,7 +20,7 @@ pub fn images_match(
     
     let mut diff_sum: u32 = 0;
     for y in 0..sample_h {
-        let screen_start = (y + coords.1 as usize) * screen_w + coords.0 as usize;
+        let screen_start = (start_y + y) * screen_w + start_x;
         let sample_start = y * sample_w;
         for x in 0..sample_w {
             for c in 0..channels {
@@ -32,8 +33,8 @@ pub fn images_match(
 
 
 pub fn find_sample(
-    screen: ImageView,
-    sample: ImageView,
+    screen: &ImageView,
+    sample: &ImageView,
 ) -> Option<(usize, usize)> {
     assert_eq!(screen.channels, sample.channels);
     let channels = screen.channels;
