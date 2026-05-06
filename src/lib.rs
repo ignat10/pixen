@@ -11,9 +11,9 @@ pub fn images_match(
     assert_eq!(screen.channels, sample.channels);
     let channels = screen.channels;
 
-    let screen_w = screen.width as usize;
-    let sample_w = sample.width as usize;
-    let sample_h = sample.height as usize;
+    let screen_w = screen.width;
+    let sample_w = sample.width;
+    let sample_h = sample.height;
 
     let raw_screen = screen.buffer;
     let raw_sample = sample.buffer;
@@ -94,4 +94,81 @@ pub struct ImageView<'a> {
     pub channels: usize,
     pub width: usize,
     pub height: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    const SCREEN_BUFFER: &[u8] = &[
+        66,  66,  66,  66,  66,  66,  66,  66,  66,
+        66,  66,  66,   0,   0,   0, 255, 255, 255,
+        66,  66,  66, 255, 255, 255,   0,   0,   0,
+        66,  66,  66, 100, 100, 100,  50,  50,  50,
+    ];
+
+    const SAMPLE_BUFFER: &[u8] = &[
+          5,   5,   5, 250, 250, 250,
+        250, 250, 250,   5,   5,   5,
+        105,  95, 100,  45,  55,  50,
+    ];
+
+    const DIFFERENT_SAMPLE_BUFFER: &[u8] = &[
+        255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255,
+    ];
+
+    #[test]
+    fn test_images_match() {
+        let screen = ImageView {
+            buffer: SCREEN_BUFFER,
+            channels: 3,
+            width: 3,
+            height: 4,
+        };
+        let sample = ImageView {
+            buffer: SAMPLE_BUFFER,
+            channels: 3,
+            width: 2,
+            height: 3,
+        };
+        assert!(!images_match(&screen, &sample, 0, 0));
+        assert!(!images_match(&screen, &sample, 0, 1));
+        assert!(!images_match(&screen, &sample, 1, 0));
+        assert!(images_match(&screen, &sample, 1, 1));
+    }
+
+    #[test]
+    fn test_find_sample_found() {
+        let screen = ImageView {
+            buffer: SCREEN_BUFFER,
+            channels: 3,
+            width: 3,
+            height: 4,
+        };
+        let sample = ImageView {
+            buffer: SAMPLE_BUFFER,
+            channels: 3,
+            width: 2,
+            height: 3,
+        };
+        assert_eq!(find_sample(&screen, &sample), Some((1, 1)));
+    }
+
+    #[test]
+    fn test_find_sample_not_found() {
+        let screen = ImageView {
+            buffer: SCREEN_BUFFER,
+            channels: 3,
+            width: 3,
+            height: 4,
+        };
+        let sample = ImageView {
+            buffer: DIFFERENT_SAMPLE_BUFFER,
+            channels: 3,
+            width: 2,
+            height: 3,
+        };
+        assert_eq!(find_sample(&screen, &sample), None);
+    }
 }
