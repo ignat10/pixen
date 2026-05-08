@@ -55,7 +55,6 @@ pub fn find_sample(
     let mut min_diff = u32::MAX;
     let mut best_idx: usize = 0;
     for start_row_idx in (0..=raw_screen.len() - sample_h * screen_row_len).step_by(screen_row_len)  {
-        println!("start_row_idx: {}", start_row_idx);
         for start_idx in (start_row_idx..=start_row_idx + screen_row_len - sample_row_len).step_by(channels) {
             let mut diff_sum: u32 = 0;
             for (y_idx, sample_start) in 
