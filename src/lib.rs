@@ -57,21 +57,22 @@ pub fn find_sample(
     for start_row_idx in (0..=raw_screen.len() - sample_h * screen_row_len).step_by(screen_row_len)  {
         for start_idx in (start_row_idx..=start_row_idx + screen_row_len - sample_row_len).step_by(channels) {
             let mut diff_sum: u32 = 0;
-            for (y_idx, sample_start) in 
-            (start_idx..).step_by(screen_row_len * h_step)
-            .zip((0..raw_sample.len()).step_by(sample_row_len * h_step))
-            {
-                for (x_idx, sample_idx) in 
-                (y_idx..).step_by(w_step)
-                .zip((sample_start..sample_start + sample_row_len).step_by(w_step))
-                {
-                    for c in 0..channels {
-                        diff_sum += raw_screen[x_idx + c].abs_diff(raw_sample[sample_idx + c]) as u32;
-                    }
+
+            let mut y_idx = start_idx;
+            let mut sample_start = 0;
+            while sample_start < raw_sample.len() {
+                let mut x_idx = y_idx;
+                let mut sample_idx = sample_start;
+                while sample_idx < sample_start + sample_row_len {
+                    diff_sum += raw_screen[x_idx].abs_diff(raw_sample[sample_idx]) as u32;
+                    x_idx += w_step;
+                    sample_idx += w_step;
                 }
                 if diff_sum > min_diff {
                     break;
                 }
+                y_idx += screen_row_len * h_step;
+                sample_start += sample_row_len * h_step;
             }
             if diff_sum < min_diff {
                 min_diff = diff_sum;
