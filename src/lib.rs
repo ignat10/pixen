@@ -3,8 +3,8 @@ const TOLERANCE: f32 = 0.05;
 
 
 pub fn images_match(
-    screen: &ImageView,
-    sample: &ImageView,
+    screen: &Image,
+    sample: &Image,
     start_x: usize,
     start_y: usize,
 ) -> bool {
@@ -32,8 +32,8 @@ pub fn images_match(
 
 
 pub fn find_sample(
-    screen: &ImageView,
-    sample: &ImageView,
+    screen: &Image,
+    sample: &Image,
 ) -> Option<(usize, usize)> {
     assert_eq!(screen.channels, sample.channels);
     let channels = screen.channels;
@@ -93,7 +93,7 @@ pub fn find_sample(
 }
 
 
-pub struct ImageView<'a> {
+pub struct Image<'a> {
     pub buffer: &'a [u8],
     pub channels: usize,
     pub width: usize,
@@ -124,13 +124,13 @@ mod tests {
 
     #[test]
     fn test_images_match() {
-        let screen = ImageView {
+        let screen = Image {
             buffer: SCREEN_BUFFER,
             channels: 3,
             width: 3,
             height: 4,
         };
-        let sample = ImageView {
+        let sample = Image {
             buffer: SAMPLE_BUFFER,
             channels: 3,
             width: 2,
@@ -145,13 +145,13 @@ mod tests {
 
     #[test]
     fn test_find_sample_found() {
-        let screen = ImageView {
+        let screen = Image {
             buffer: SCREEN_BUFFER,
             channels: 3,
             width: 3,
             height: 4,
         };
-        let sample = ImageView {
+        let sample = Image {
             buffer: SAMPLE_BUFFER,
             channels: 3,
             width: 2,
@@ -162,13 +162,13 @@ mod tests {
 
     #[test]
     fn test_find_sample_not_found() {
-        let screen = ImageView {
+        let screen = Image {
             buffer: SCREEN_BUFFER,
             channels: 3,
             width: 3,
             height: 4,
         };
-        let sample = ImageView {
+        let sample = Image {
             buffer: DIFFERENT_SAMPLE_BUFFER,
             channels: 3,
             width: 2,
