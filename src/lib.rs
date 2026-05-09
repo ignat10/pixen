@@ -3,8 +3,8 @@ const TOLERANCE: f32 = 0.05;
 
 
 pub fn images_match(
-    screen: &ImageView,
-    sample: &ImageView,
+    screen: &Image,
+    sample: &Image,
     start_x: usize,
     start_y: usize,
 ) -> bool {
@@ -15,8 +15,8 @@ pub fn images_match(
     let sample_w = sample.width * channels;
     let sample_h = sample.height;
 
-    let raw_screen = screen.buffer;
-    let raw_sample = sample.buffer;
+    let raw_screen = &screen.buffer;
+    let raw_sample = &sample.buffer;
     
     let mut diff_sum: u32 = 0;
     let mut sample_idx = 0;
@@ -32,8 +32,8 @@ pub fn images_match(
 
 
 pub fn find_sample(
-    screen: &ImageView,
-    sample: &ImageView,
+    screen: &Image,
+    sample: &Image,
 ) -> Option<(usize, usize)> {
     assert_eq!(screen.channels, sample.channels);
     let channels = screen.channels;
@@ -46,8 +46,8 @@ pub fn find_sample(
     let screen_row_len = screen_w * channels;
     let sample_row_len = sample_w * channels;
 
-    let raw_screen = screen.buffer;
-    let raw_sample = sample.buffer;
+    let raw_screen = &screen.buffer;
+    let raw_sample = &sample.buffer;
 
     let w_step = sample_w.isqrt() * channels;
     let h_step = sample_h.isqrt();
@@ -93,8 +93,8 @@ pub fn find_sample(
 }
 
 
-pub struct ImageView<'a> {
-    pub buffer: &'a [u8],
+pub struct Image {
+    pub buffer: Vec<u8>,
     pub channels: usize,
     pub width: usize,
     pub height: usize,
@@ -124,14 +124,14 @@ mod tests {
 
     #[test]
     fn test_images_match() {
-        let screen = ImageView {
-            buffer: SCREEN_BUFFER,
+        let screen = Image {
+            buffer: SCREEN_BUFFER.to_vec(),
             channels: 3,
             width: 3,
             height: 4,
         };
-        let sample = ImageView {
-            buffer: SAMPLE_BUFFER,
+        let sample = Image {
+            buffer: SAMPLE_BUFFER.to_vec(),
             channels: 3,
             width: 2,
             height: 3,
@@ -145,14 +145,14 @@ mod tests {
 
     #[test]
     fn test_find_sample_found() {
-        let screen = ImageView {
-            buffer: SCREEN_BUFFER,
+        let screen = Image {
+            buffer: SCREEN_BUFFER.to_vec(),
             channels: 3,
             width: 3,
             height: 4,
         };
-        let sample = ImageView {
-            buffer: SAMPLE_BUFFER,
+        let sample = Image {
+            buffer: SAMPLE_BUFFER.to_vec(),
             channels: 3,
             width: 2,
             height: 3,
@@ -162,14 +162,14 @@ mod tests {
 
     #[test]
     fn test_find_sample_not_found() {
-        let screen = ImageView {
-            buffer: SCREEN_BUFFER,
+        let screen = Image {
+            buffer: SCREEN_BUFFER.to_vec(),
             channels: 3,
             width: 3,
             height: 4,
         };
-        let sample = ImageView {
-            buffer: DIFFERENT_SAMPLE_BUFFER,
+        let sample = Image {
+            buffer: DIFFERENT_SAMPLE_BUFFER.to_vec(),
             channels: 3,
             width: 2,
             height: 3,
