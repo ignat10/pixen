@@ -58,14 +58,12 @@ pub fn find_sample(
         for start_idx in (start_row_idx..=start_row_idx + screen_row_len - sample_row_len).step_by(channels) {
             let mut diff_sum: u32 = 0;
             for (y_idx, sample_start) in 
-            (start_idx..).step_by(screen_row_len)
-            .zip((0..raw_sample.len()).step_by(sample_row_len))
-            .step_by(h_step)
+            (start_idx..).step_by(screen_row_len * h_step)
+            .zip((0..raw_sample.len()).step_by(sample_row_len * h_step))
             {
                 for (x_idx, sample_idx) in 
-                (y_idx..)
-                .zip(sample_start..sample_start + sample_row_len)
-                .step_by(w_step)
+                (y_idx..).step_by(w_step)
+                .zip((sample_start..sample_start + sample_row_len).step_by(w_step))
                 {
                     for c in 0..channels {
                         diff_sum += raw_screen[x_idx + c].abs_diff(raw_sample[sample_idx + c]) as u32;
@@ -84,10 +82,10 @@ pub fn find_sample(
     let checked_bytes = (sample_row_len / w_step) * (sample_h / h_step) * channels;
     // println!("{}", min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32);  // tolerance needed for the best match
     
-    return if TOLERANCE > min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32 {
+    if TOLERANCE > min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32 {
         let x = best_idx % screen_row_len / channels;
         let y = best_idx / screen_row_len;
-         Some((x, y))
+        Some((x, y))
     } else {
         None
     }
