@@ -100,7 +100,7 @@ pub struct Image {
     pub channels: usize,
 }
 impl Image {
-    fn new(
+    pub fn new(
         buffer: Vec<u8>,
         width: impl Into<usize>,
         height: impl Into<usize>,
