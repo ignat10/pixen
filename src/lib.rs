@@ -95,10 +95,31 @@ pub fn find_sample(
 
 pub struct Image {
     pub buffer: Vec<u8>,
-    pub channels: usize,
     pub width: usize,
     pub height: usize,
+    pub channels: usize,
 }
+impl Image {
+    fn new(
+        buffer: Vec<u8>,
+        width: impl Into<usize>,
+        height: impl Into<usize>,
+        channels: impl Into<usize>,
+    ) -> Self {
+        let width = width.into();
+        let height = height.into();
+        let channels = channels.into();
+
+        assert_eq!(width * height * channels, buffer.len());
+        Self {
+            buffer,
+            width,
+            height,
+            channels,
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
