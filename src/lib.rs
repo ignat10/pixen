@@ -122,6 +122,8 @@ impl Image {
     pub fn width(&self) -> usize { self.width }
     pub fn height(&self) -> usize { self.height }
     pub fn channels(&self) -> usize { self.channels }
+
+    pub fn as_raw(&self) -> &Vec<u8> { &self.buffer }
 }
 
 
