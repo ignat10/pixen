@@ -94,10 +94,10 @@ pub fn find_sample(
 
 
 pub struct Image {
-    pub buffer: Vec<u8>,
-    pub width: usize,
-    pub height: usize,
-    pub channels: usize,
+    pub(crate) buffer: Vec<u8>,
+    pub(crate) width: usize,
+    pub(crate) height: usize,
+    pub(crate) channels: usize,
 }
 impl Image {
     pub fn new(
