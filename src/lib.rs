@@ -72,8 +72,8 @@ pub fn find_sample(
                 let mut screen_x = screen_row;
                 let mut sample_x = sample_row;
                 while sample_x < sample_row + sample_row_len {
-                    for (screen_c, sample_c) in (screen_x..screen_x + channels).zip(sample_x..sample_x + channels) {
-                        diff_sum += raw_screen[screen_c].abs_diff(raw_sample[sample_c]) as u32;
+                    for (&a, &b) in raw_screen[screen_x..screen_x + channels].iter().zip(raw_sample[sample_x..sample_x + channels].iter()) {
+                        diff_sum += a.abs_diff(b) as u32;
                     }
                     screen_x += w_step;
                     sample_x += w_step;
