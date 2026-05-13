@@ -36,49 +36,61 @@ pub fn find_sample(
     sample: &Image,
 ) -> Option<(usize, usize)> {
     assert_eq!(screen.channels, sample.channels);
-    let channels = screen.channels;
+    let raw_screen = &screen.buffer;
+    let raw_sample = &sample.buffer;
 
     let screen_w = screen.width;
     let sample_w = sample.width;
 
+    let screen_h = screen.height;
     let sample_h = sample.height;
+
+    let channels = screen.channels;
 
     let screen_row_len = screen_w * channels;
     let sample_row_len = sample_w * channels;
 
-    let raw_screen = &screen.buffer;
-    let raw_sample = &sample.buffer;
+    let x_positions = screen_row_len - sample_row_len;
+    let y_positions = (screen_h - sample_h) * screen_row_len;
 
     let w_step = sample_w.isqrt() * channels;
     let h_step = sample_h.isqrt();
 
     let mut min_diff = u32::MAX;
     let mut best_idx: usize = 0;
-    for start_row_idx in (0..=raw_screen.len() - sample_h * screen_row_len).step_by(screen_row_len)  {
-        for start_idx in (start_row_idx..=start_row_idx + screen_row_len - sample_row_len).step_by(channels) {
+
+    let mut pos_y: usize = 0;
+    while pos_y <= y_positions {
+        let end_posx = pos_y + x_positions;
+        let mut pos_x = pos_y;
+        while pos_x <= end_posx {
             let mut diff_sum: u32 = 0;
 
-            let mut y_idx = start_idx;
-            let mut sample_start = 0;
-            while sample_start < raw_sample.len() {
-                let mut x_idx = y_idx;
-                let mut sample_idx = sample_start;
-                while sample_idx < sample_start + sample_row_len {
-                    diff_sum += raw_screen[x_idx].abs_diff(raw_sample[sample_idx]) as u32;
-                    x_idx += w_step;
-                    sample_idx += w_step;
+            let mut screen_row = pos_x;
+            let mut sample_row = 0;
+            while sample_row < raw_sample.len() {
+                let mut screen_x = screen_row;
+                let mut sample_x = sample_row;
+                while sample_x < sample_row + sample_row_len {
+                    for (screen_c, sample_c) in (screen_x..screen_x + channels).zip(sample_x..sample_x + channels) {
+                        diff_sum += raw_screen[screen_c].abs_diff(raw_sample[sample_c]) as u32;
+                    }
+                    screen_x += w_step;
+                    sample_x += w_step;
                 }
                 if diff_sum > min_diff {
                     break;
                 }
-                y_idx += screen_row_len * h_step;
-                sample_start += sample_row_len * h_step;
+                screen_row += screen_row_len * h_step;
+                sample_row += sample_row_len * h_step;
             }
             if diff_sum < min_diff {
                 min_diff = diff_sum;
-                best_idx = start_idx;
+                best_idx = pos_x;
             }
+            pos_x += channels;
         }
+        pos_y += screen_row_len;
     }
     let checked_bytes = (sample_row_len / w_step) * (sample_h / h_step) * channels;
     // println!("{}", min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32);  // tolerance needed for the best match
