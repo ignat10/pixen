@@ -65,24 +65,25 @@ pub fn find_sample(
         let mut pos_x = pos_y;
         while pos_x <= end_posx {
             let mut diff_sum: u32 = 0;
-
             let mut screen_row = pos_x;
             let mut sample_row = 0;
             while sample_row < raw_sample.len() {
-                let mut screen_x = screen_row;
-                let mut sample_x = sample_row;
-                while sample_x < sample_row + sample_row_len {
-                    for (&a, &b) in raw_screen[screen_x..screen_x + channels].iter().zip(raw_sample[sample_x..sample_x + channels].iter()) {
-                        diff_sum += a.abs_diff(b) as u32;
+                unsafe {
+                    let screen_x = raw_screen.as_ptr().add(screen_row);
+                    let sample_x = raw_sample.as_ptr().add(sample_row);
+                    let mut i = 0;
+                    while i < sample_row_len {
+                        for c in i..i + channels {
+                            diff_sum += (*screen_x.add(c)).abs_diff(*sample_x.add(c)) as u32;
+                        }
+                        i += w_step;
                     }
-                    screen_x += w_step;
-                    sample_x += w_step;
+                    if diff_sum > min_diff {
+                        break;
+                    }
+                    screen_row += screen_row_len * h_step;
+                    sample_row += sample_row_len * h_step;
                 }
-                if diff_sum > min_diff {
-                    break;
-                }
-                screen_row += screen_row_len * h_step;
-                sample_row += sample_row_len * h_step;
             }
             if diff_sum < min_diff {
                 min_diff = diff_sum;
