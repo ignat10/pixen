@@ -115,13 +115,13 @@ pub struct Image {
 impl Image {
     pub fn new(
         buffer: Vec<u8>,
-        width: impl Into<usize>,
-        height: impl Into<usize>,
-        channels: impl Into<usize>,
+        width: impl Into<u32>,
+        height: impl Into<u32>,
+        channels: impl Into<u32>,
     ) -> Self {
-        let width = width.into();
-        let height = height.into();
-        let channels = channels.into();
+        let width: usize = width.into() as usize;
+        let height: usize = height.into() as usize;
+        let channels: usize = channels.into() as usize;
 
         assert_eq!(width * height * channels, buffer.len());
         Self {
