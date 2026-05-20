@@ -34,7 +34,7 @@ pub fn images_match(
 pub fn find_sample(
     screen: &Image,
     sample: &Image,
-) -> Option<(usize, usize)> {
+) -> Option<[u16; 2]> {
     assert_eq!(screen.channels, sample.channels);
     let raw_screen = &screen.buffer;
     let raw_sample = &sample.buffer;
@@ -97,9 +97,9 @@ pub fn find_sample(
     // println!("{}", min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32);  // tolerance needed for the best match
     
     if TOLERANCE > min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32 {
-        let x = best_idx % screen_row_len / channels;
-        let y = best_idx / screen_row_len;
-        Some((x, y))
+        let x = (best_idx % screen_row_len / channels).try_into().unwrap();
+        let y = (best_idx / screen_row_len).try_into().unwrap();
+        Some([x, y])
     } else {
         None
     }
@@ -197,7 +197,7 @@ mod tests {
             width: 2,
             height: 3,
         };
-        assert_eq!(find_sample(&screen, &sample), Some((1, 1)));
+        assert_eq!(find_sample(&screen, &sample), Some([1, 1]));
     }
 
     #[test]
