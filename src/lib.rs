@@ -2,13 +2,22 @@ const TOLERANCE: f32 = 0.05;
 
 
 
-pub fn images_match(
+pub fn images_match<T: Into<u32>>(
     screen: &Image,
     sample: &Image,
-    start_x: usize,
-    start_y: usize,
+    coords: [T; 2]
 ) -> bool {
     assert_eq!(screen.channels, sample.channels);
+    assert!(screen.width >= sample.width);
+    assert!(screen.height >= sample.height);
+
+    let [start_x, start_y] = coords;
+    let start_x = start_x.into() as usize;
+    let start_y = start_y.into() as usize;
+
+    assert!(start_x <= screen.width - sample.width);
+    assert!(start_y <= screen.height - sample.height);
+
     let channels = screen.channels;
 
     let screen_w = screen.width * channels;
@@ -177,10 +186,10 @@ mod tests {
             height: 3,
         };
 
-        assert!(!images_match(&screen, &sample, 0, 0));
-        assert!(!images_match(&screen, &sample, 0, 1));
-        assert!(!images_match(&screen, &sample, 1, 0));
-        assert!(images_match(&screen, &sample, 1, 1));
+        assert!(!images_match(&screen, &sample, [0u8, 0]));
+        assert!(!images_match(&screen, &sample, [0u8, 1]));
+        assert!(!images_match(&screen, &sample, [1u8, 0]));
+        assert!(images_match(&screen, &sample, [1u8, 1]));
     }
 
     #[test]
