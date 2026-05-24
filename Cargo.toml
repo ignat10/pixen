@@ -3,4 +3,5 @@ name = "pixen"
 version = "0.2.0"
 edition = "2024"
 
-[dependencies]
+[dev-dependencies]
+stb_image = "0.3.0"
