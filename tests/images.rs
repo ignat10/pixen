@@ -24,19 +24,19 @@ const DIFFERENT_SAMPLE_BUFFER: &[u8] = &[
 pub(crate) static SCREEN: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
         SCREEN_BUFFER.into(),
-        3u8,
-        4u8,
-        3u8
-    )
+        3,
+        4,
+        3
+    ).unwrap()
 });
 
 pub(crate) static SAMPLE: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
         SAMPLE_BUFFER.into(),
-        2u8,
-        3u8,
-        3u8
-    )
+        2,
+        3,
+        3
+    ).unwrap()
 });
 
 

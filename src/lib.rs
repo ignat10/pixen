@@ -2,18 +2,18 @@ const TOLERANCE: f32 = 0.05;
 
 
 
-pub fn images_match<T: Into<u32>>(
+pub fn images_match(
     screen: &Image,
     sample: &Image,
-    coords: [T; 2]
+    coords: [u16; 2]
 ) -> bool {
     assert_eq!(screen.channels, sample.channels);
     assert!(screen.width >= sample.width);
     assert!(screen.height >= sample.height);
 
     let [start_x, start_y] = coords;
-    let start_x = start_x.into() as usize;
-    let start_y = start_y.into() as usize;
+    let start_x: usize = start_x.into();
+    let start_y: usize = start_y.into();
 
     assert!(start_x <= screen.width - sample.width);
     assert!(start_y <= screen.height - sample.height);
@@ -124,21 +124,29 @@ pub struct Image {
 impl Image {
     pub fn new(
         buffer: Vec<u8>,
-        width: impl Into<u32>,
-        height: impl Into<u32>,
-        channels: impl Into<u32>,
-    ) -> Self {
-        let width: usize = width.into() as usize;
-        let height: usize = height.into() as usize;
-        let channels: usize = channels.into() as usize;
-
-        assert_eq!(width * height * channels, buffer.len());
-        Self {
-            buffer,
-            width,
-            height,
-            channels,
+        width: usize,
+        height: usize,
+        channels: usize,
+    ) -> Result<Image, String> {
+        if width * height * channels != buffer.len() {
+            return Err(format!(
+                "Buffer size mismatch: expected {}×{}×{} = {} bytes, got {} bytes",
+                width,
+                height,
+                channels,
+                width * height * channels,
+                buffer.len()
+            ));
         }
+
+        Ok(
+            Self {
+                buffer,
+                width,
+                height,
+                channels,
+            }
+        )
     }
 
     pub fn width(&self) -> usize { self.width }
