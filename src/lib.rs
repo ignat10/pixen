@@ -7,9 +7,9 @@ pub fn images_match(
     sample: &Image,
     coords: [u16; 2]
 ) -> bool {
-    assert_eq!(screen.channels, sample.channels);
-    assert!(screen.width >= sample.width);
-    assert!(screen.height >= sample.height);
+    assert_eq!(screen.channels, sample.channels, "screen channels = {}, sample channels = {}", screen.channels, sample.channels);
+    assert!(screen.width >= sample.width, "screen width = {}, sample width = {}", screen.width, sample.width);
+    assert!(screen.height >= sample.height, "screen height = {}, sample height = {}", screen.height, sample.height);
 
     let [start_x, start_y] = coords;
     let start_x: usize = start_x.into();
@@ -70,9 +70,9 @@ pub fn find_sample(
 
     let mut pos_y: usize = 0;
     while pos_y <= y_positions {
-        let end_posx = pos_y + x_positions;
+        let end_pos_x = pos_y + x_positions;
         let mut pos_x = pos_y;
-        while pos_x <= end_posx {
+        while pos_x <= end_pos_x {
             let mut diff_sum: u32 = 0;
             let mut screen_row = pos_x;
             let mut sample_row = 0;
