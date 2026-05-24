@@ -32,7 +32,7 @@ const DIFFERENT_SAMPLE_BUFFER: &[u8] = &[
 ];
 
 
-pub(crate) static SCREEN: LazyLock<Image> = LazyLock::new(|| {
+pub static SCREEN: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
         SCREEN_BUFFER.into(),
         3,
@@ -41,7 +41,7 @@ pub(crate) static SCREEN: LazyLock<Image> = LazyLock::new(|| {
     ).unwrap()
 });
 
-pub(crate) static SAMPLE: LazyLock<Image> = LazyLock::new(|| {
+pub static SAMPLE: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
         SAMPLE_BUFFER.into(),
         2,
@@ -51,7 +51,7 @@ pub(crate) static SAMPLE: LazyLock<Image> = LazyLock::new(|| {
 });
 
 
-pub(crate) static DIFFERENT_SAMPLE: LazyLock<Image> = LazyLock::new(|| {
+pub static DIFFERENT_SAMPLE: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
         DIFFERENT_SAMPLE_BUFFER.into(),
         2,

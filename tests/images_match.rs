@@ -1,4 +1,4 @@
-mod images;
+pub mod images;
 
 use pixen::images_match;
 
