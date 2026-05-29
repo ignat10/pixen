@@ -45,8 +45,11 @@ pub fn find_sample(
     sample: &Image,
 ) -> Option<[u16; 2]> {
     assert_eq!(screen.channels, sample.channels);
-    let raw_screen = &screen.buffer;
-    let raw_sample = &sample.buffer;
+    let screen_buf = &screen.buffer;
+    let sample_buf = &sample.buffer;
+
+    let screen_int_buf: Vec<i16> = screen.buffer.iter().copied().map(i16::from).collect();
+    let sample_int_buf: Vec<i16> = sample.buffer.iter().copied().map(i16::from).collect();
 
     let screen_w = screen.width;
     let sample_w = sample.width;
@@ -65,25 +68,50 @@ pub fn find_sample(
     let w_step = sample_w.isqrt() * channels;
     let h_step = sample_h.isqrt();
 
+    let sample_mean: u8 = (sample_buf.iter().copied().map(u32::from).sum::<u32>() / sample_buf.len() as u32).try_into().unwrap();
+    let mut screen_columns_sum: Vec<u16>;
+    dbg!(sample_mean);
+
     let mut min_diff = u32::MAX;
     let mut best_idx: usize = 0;
 
     let mut pos_y: usize = 0;
     while pos_y <= y_positions {
+        screen_columns_sum = vec![0; screen_row_len];
+
+        let max_y = pos_y + sample_h * screen_row_len;
+        let mut y = pos_y;
+        while y < max_y {
+            for (cell, x) in screen_columns_sum.iter_mut().zip(y..) {
+                *cell += screen_buf[x] as u16;
+            }
+            y += screen_row_len
+        }
+
         let end_pos_x = pos_y + x_positions;
         let mut pos_x = pos_y;
+        let mut x_num = 0;
         while pos_x <= end_pos_x {
+
+            let screen_mean: u8 = (
+                screen_columns_sum[x_num..x_num + sample_row_len].iter()
+                .copied()
+                .map(u32::from)
+                .sum::<u32>() / sample_buf.len() as u32
+            ).try_into().unwrap();
+            let delta: i16 = i16::from(screen_mean) - i16::from(sample_mean);
+
             let mut diff_sum: u32 = 0;
             let mut screen_row = pos_x;
             let mut sample_row = 0;
-            while sample_row < raw_sample.len() {
+            while sample_row < sample_buf.len() {
                 unsafe {
-                    let screen_x = raw_screen.as_ptr().add(screen_row);
-                    let sample_x = raw_sample.as_ptr().add(sample_row);
+                    let screen_x = screen_int_buf.as_ptr().add(screen_row);
+                    let sample_x = sample_int_buf.as_ptr().add(sample_row);
                     let mut i = 0;
                     while i < sample_row_len {
                         for c in i..i + channels {
-                            diff_sum += (*screen_x.add(c)).abs_diff(*sample_x.add(c)) as u32;
+                            diff_sum += (*screen_x.add(c) - *sample_x.add(c) - delta).abs() as u32;
                         }
                         i += w_step;
                     }
@@ -99,6 +127,7 @@ pub fn find_sample(
                 best_idx = pos_x;
             }
             pos_x += channels;
+            x_num += channels;
         }
         pos_y += screen_row_len;
     }
