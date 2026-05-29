@@ -1,4 +1,4 @@
-const TOLERANCE: f32 = 0.05;
+const TOLERANCE: f32 = 0.1;
 
 
 
@@ -70,7 +70,6 @@ pub fn find_sample(
 
     let sample_mean: u8 = (sample_buf.iter().copied().map(u32::from).sum::<u32>() / sample_buf.len() as u32).try_into().unwrap();
     let mut screen_columns_sum: Vec<u16>;
-    dbg!(sample_mean);
 
     let mut min_diff = u32::MAX;
     let mut best_idx: usize = 0;
