@@ -15,27 +15,36 @@ pub fn images_match(
     let start_x: usize = start_x.into();
     let start_y: usize = start_y.into();
 
-    assert!(start_x <= screen.width - sample.width);
-    assert!(start_y <= screen.height - sample.height);
+    assert!(start_x <= screen.width - sample.width, "start_x = {}, screen_width = {}, sample_width = {}. start_x is too big.", start_x, screen.width, sample.width);
+    assert!(start_y <= screen.height - sample.height, "start_y = {}, screen_height = {}. sample_height = {}, start_y is too_big.", start_y, screen.height, sample.height);
 
     let channels = screen.channels;
 
-    let screen_w = screen.width * channels;
-    let sample_w = sample.width * channels;
     let sample_h = sample.height;
 
-    let raw_screen = &screen.buffer;
-    let raw_sample = &sample.buffer;
-    
-    let mut diff_sum: u32 = 0;
-    let mut sample_idx = 0;
-    let corner_idx = start_y * screen_w + start_x * channels;
-    for start_row_idx in (corner_idx..corner_idx + sample_h * screen_w).step_by(screen_w) {
-        for screen_idx in start_row_idx..start_row_idx + sample_w {
-            diff_sum += raw_screen[screen_idx].abs_diff(raw_sample[sample_idx]) as u32;
-            sample_idx += 1;
-        }
-    };
+    let screen_row_len = screen.row_len;
+    let sample_row_len = sample.row_len;
+
+    let raw_screen = screen.buffer.iter().copied().map(i16::from).collect::<Vec<i16>>();
+    let raw_sample: Vec<i16> = sample.buffer
+        .iter()
+        .map(|&a| i16::from(a))
+        .collect();
+
+
+    let corner_idx = start_y * screen_row_len + start_x * channels;
+    let diff_sum = match_window(
+        &raw_screen,
+        &raw_sample,
+        corner_idx,
+        sample_row_len,
+        channels,
+        screen_row_len,
+        screen_row_len * sample_h,
+        0,
+        channels,
+        (TOLERANCE * (raw_sample.len() * u8::MAX as usize) as f32) as u32
+    );
     TOLERANCE > diff_sum as f32 / (raw_sample.len() * u8::MAX as usize) as f32
 }
 
@@ -48,28 +57,40 @@ pub fn find_sample(
     let screen_buf = &screen.buffer;
     let sample_buf = &sample.buffer;
 
-    let screen_int_buf: Vec<i16> = screen.buffer.iter().copied().map(i16::from).collect();
-    let sample_int_buf: Vec<i16> = sample.buffer.iter().copied().map(i16::from).collect();
-
-    let screen_w = screen.width;
-    let sample_w = sample.width;
-
     let screen_h = screen.height;
     let sample_h = sample.height;
 
     let channels = screen.channels;
 
-    let screen_row_len = screen_w * channels;
-    let sample_row_len = sample_w * channels;
+    let screen_row_len = screen.row_len;
+    let sample_row_len = sample.row_len;
 
     let x_positions = screen_row_len - sample_row_len;
     let y_positions = (screen_h - sample_h) * screen_row_len;
 
-    let w_step = sample_w.isqrt() * channels;
+    let w_step = sample.width.isqrt() * channels;
     let h_step = sample_h.isqrt();
 
+    let area = sample_h * screen_row_len;
+
+    let screen_int_buf: Vec<i16> = screen.buffer.iter().copied().map(i16::from).collect();
+    let sample_int_buf: Vec<i16> = sample.buffer
+        .chunks_exact(sample_row_len)
+        .step_by(h_step)
+        .flat_map(|row|
+                (0..sample_row_len)
+                    .step_by(w_step)
+                    .flat_map(|idx|
+                        row[idx..idx + channels]
+                            .iter()
+                            .map(|&a| i16::from(a))
+                    )
+                    .collect::<Vec<i16>>()
+            )
+        .collect();
+
     let sample_mean: u8 = (sample_buf.iter().copied().map(u32::from).sum::<u32>() / sample_buf.len() as u32).try_into().unwrap();
-    let mut screen_columns_sum: Vec<u16>;
+    let mut screen_columns_sum: Vec<u32>;
 
     let mut min_diff = u32::MAX;
     let mut best_idx: usize = 0;
@@ -82,7 +103,7 @@ pub fn find_sample(
         let mut y = pos_y;
         while y < max_y {
             for (cell, x) in screen_columns_sum.iter_mut().zip(y..) {
-                *cell += screen_buf[x] as u16;
+                *cell += screen_buf[x] as u32;
             }
             y += screen_row_len
         }
@@ -95,32 +116,21 @@ pub fn find_sample(
             let screen_mean: u8 = (
                 screen_columns_sum[x_num..x_num + sample_row_len].iter()
                 .copied()
-                .map(u32::from)
                 .sum::<u32>() / sample_buf.len() as u32
             ).try_into().unwrap();
             let delta: i16 = i16::from(screen_mean) - i16::from(sample_mean);
-
-            let mut diff_sum: u32 = 0;
-            let mut screen_row = pos_x;
-            let mut sample_row = 0;
-            while sample_row < sample_buf.len() {
-                unsafe {
-                    let screen_x = screen_int_buf.as_ptr().add(screen_row);
-                    let sample_x = sample_int_buf.as_ptr().add(sample_row);
-                    let mut i = 0;
-                    while i < sample_row_len {
-                        for c in i..i + channels {
-                            diff_sum += (*screen_x.add(c) - *sample_x.add(c) - delta).abs() as u32;
-                        }
-                        i += w_step;
-                    }
-                    if diff_sum > min_diff {
-                        break;
-                    }
-                    screen_row += screen_row_len * h_step;
-                    sample_row += sample_row_len * h_step;
-                }
-            }
+            let diff_sum = match_window(
+                &screen_int_buf,
+                &sample_int_buf,
+                pos_x,
+                sample_row_len,
+                w_step,
+                h_step * screen_row_len,
+                area,
+                delta,
+                channels,
+                min_diff
+            );
             if diff_sum < min_diff {
                 min_diff = diff_sum;
                 best_idx = pos_x;
@@ -130,10 +140,9 @@ pub fn find_sample(
         }
         pos_y += screen_row_len;
     }
-    let checked_bytes = (sample_row_len / w_step) * (sample_h / h_step) * channels;
     // println!("{}", min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32);  // tolerance needed for the best match
     
-    if TOLERANCE > min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32 {
+    if TOLERANCE > min_diff as f32 / (sample_int_buf.len() * u8::MAX as usize) as f32 {
         let x = (best_idx % screen_row_len / channels).try_into().unwrap();
         let y = (best_idx / screen_row_len).try_into().unwrap();
         Some([x, y])
@@ -142,12 +151,50 @@ pub fn find_sample(
     }
 }
 
+#[inline(always)]
+fn match_window(
+    screen: &[i16],
+    sample: &[i16],
+    screen_row: usize,
+    sample_row_len: usize,
+    w_step: usize,
+    h_step: usize,
+    area: usize,
+    delta: i16,
+    channels: usize,
+    min_diff: u32,
+) -> u32 {
+    let mut diff_sum = 0;
+
+    let mut channel = 0;
+
+    let mut row = screen_row;
+    let max_row = screen_row + area;
+    'a: while row < max_row {
+        let mut idx = row;
+        let max_idx = row + sample_row_len;
+        while idx < max_idx {
+            for c in idx..idx + channels {
+                diff_sum += (screen[c] - sample[channel] - delta).abs() as u32;
+                channel += 1;
+            }
+            if diff_sum > min_diff {
+                break 'a;
+            }
+            idx += w_step;
+        }
+        row += h_step;
+    }
+    diff_sum
+}
+
 
 pub struct Image {
     pub(crate) buffer: Vec<u8>,
     pub(crate) width: usize,
     pub(crate) height: usize,
     pub(crate) channels: usize,
+    pub(crate) row_len: usize,
 }
 impl Image {
     pub fn new(
@@ -173,6 +220,7 @@ impl Image {
                 width,
                 height,
                 channels,
+                row_len: width * channels,
             }
         )
     }
