@@ -7,40 +7,49 @@ pub fn images_match(
     sample: &Image,
     coords: [u16; 2]
 ) -> bool {
-    assert_eq!(screen.channels, sample.channels, "screen channels = {}, sample channels = {}", screen.channels, sample.channels);
-    assert!(screen.width >= sample.width, "screen width = {}, sample width = {}", screen.width, sample.width);
-    assert!(screen.height >= sample.height, "screen height = {}, sample height = {}", screen.height, sample.height);
-
-    let [start_x, start_y] = coords;
-    let start_x: usize = start_x.into();
-    let start_y: usize = start_y.into();
-
-    assert!(start_x <= screen.width - sample.width, "start_x = {}, screen_width = {}, sample_width = {}. start_x is too big.", start_x, screen.width, sample.width);
-    assert!(start_y <= screen.height - sample.height, "start_y = {}, screen_height = {}. sample_height = {}, start_y is too_big.", start_y, screen.height, sample.height);
-
     let channels = screen.channels;
 
     let sample_h = sample.height;
 
-    let screen_row_len = screen.row_len;
     let sample_row_len = sample.row_len;
 
-    let raw_screen = screen.buffer.iter().copied().map(i16::from).collect::<Vec<i16>>();
+    let [start_x, start_y] = coords;
+
+    let start_x: usize = start_x.into();
+    let start_y: usize = start_y.into();
+
+    assert_eq!(screen.channels, sample.channels, "screen channels = {}, sample channels = {}", screen.channels, sample.channels);
+    assert!(screen.width >= sample.width, "screen width = {}, sample width = {}", screen.width, sample.width);
+    assert!(screen.height >= sample.height, "screen height = {}, sample height = {}", screen.height, sample.height);
+
+    assert!(start_x <= screen.width - sample.width, "start_x = {}, screen_width = {}, sample_width = {}. start_x is too big.", start_x, screen.width, sample.width);
+    assert!(start_y <= screen.height - sample.height, "start_y = {}, screen_height = {}. sample_height = {}, start_y is too_big.", start_y, screen.height, sample.height);
+
+    let start_row = start_x * channels;
+
+    let raw_screen = screen.buffer
+        .chunks_exact(screen.row_len)
+        .skip(start_y)
+        .take(sample_h)
+        .flat_map(|row| &row[start_row..start_row + sample_row_len])
+        .copied()
+        .map(i16::from)
+        .collect::<Vec<i16>>();
+
     let raw_sample: Vec<i16> = sample.buffer
         .iter()
         .map(|&a| i16::from(a))
         .collect();
 
 
-    let corner_idx = start_y * screen_row_len + start_x * channels;
     let diff_sum = match_window(
         &raw_screen,
         &raw_sample,
-        corner_idx,
+        0,
         sample_row_len,
         channels,
-        screen_row_len,
-        screen_row_len * sample_h,
+        sample_row_len,
+        sample_row_len * sample_h,
         0,
         channels,
         (TOLERANCE * (raw_sample.len() * u8::MAX as usize) as f32) as u32
