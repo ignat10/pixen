@@ -57,12 +57,67 @@ pub fn images_match(
     TOLERANCE > diff_sum as f32 / (raw_sample.len() * u8::MAX as usize) as f32
 }
 
+pub fn find_first(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
+    Some(
+        match_template(screen, sample)
+            .next()?
+            .1
+    )
+}
 
-pub fn find_sample(
+
+pub fn find_best(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
+    let results: Vec<(u32, [u16; 2])> = match_template(screen, sample).collect();
+
+    let mut best_diff = u32::MAX;
+    let mut best_coords: Option<[u16; 2]> = None;
+    for (diff, coords) in results {
+        if diff < best_diff {
+            best_coords = Some(coords);
+            best_diff = diff;
+        }
+    }
+    best_coords
+}
+
+
+pub fn find_nth(
     screen: &Image,
     sample: &Image,
+    n: usize
 ) -> Option<[u16; 2]> {
-    assert_eq!(screen.channels, sample.channels);
+    let w: u16 = screen.width.isqrt().try_into().unwrap();
+    let h: u16 = screen.height.isqrt().try_into().unwrap();
+
+    let data = match_template(screen, sample);
+    let coords: Vec<_> = data.map(|(_, coords)| coords).collect();
+    let mut coords_copy = coords.clone();
+
+    for i in (0..coords.len()).rev() {
+        for j in 0..i {
+            if coords[i][0].abs_diff(coords[j][0]) < w
+                && coords[i][1].abs_diff(coords[j][1]) < h
+            {
+                coords_copy.remove(i);
+                break;
+            }
+        }
+    }
+
+    if coords_copy.len() > n {
+        Some(coords_copy[n])
+    } else {
+        None
+    }
+}
+
+
+fn match_template(
+    screen: &Image,
+    sample: &Image,
+) -> impl Iterator<Item=(u32, [u16; 2])> {
+    assert_eq!(screen.channels, sample.channels, "different number of channels. screen: {}, sample: {}", screen.channels, sample.channels);
+
     let screen_buf = &screen.buffer;
     let sample_buf = &sample.buffer;
 
@@ -98,14 +153,12 @@ pub fn find_sample(
             )
         .collect();
 
+    let threshold: u32 = (TOLERANCE * (sample_int_buf.len() * u8::MAX as usize) as f32).round() as u32;
+
     let sample_mean: u8 = (sample_buf.iter().copied().map(u32::from).sum::<u32>() / sample_buf.len() as u32).try_into().unwrap();
-    let mut screen_columns_sum: Vec<u32>;
+    let mut screen_columns_sum: Vec<u32> = Vec::with_capacity(screen_row_len);
 
-    let mut min_diff = u32::MAX;
-    let mut best_idx: usize = 0;
-
-    let mut pos_y: usize = 0;
-    while pos_y <= y_positions {
+    (0..=y_positions).step_by(screen_row_len).flat_map(move |pos_y| {
         screen_columns_sum = vec![0; screen_row_len];
 
         let max_y = pos_y + sample_h * screen_row_len;
@@ -114,19 +167,18 @@ pub fn find_sample(
             for (cell, x) in screen_columns_sum.iter_mut().zip(y..) {
                 *cell += screen_buf[x] as u32;
             }
-            y += screen_row_len
+            y += screen_row_len;
         }
 
-        let end_pos_x = pos_y + x_positions;
-        let mut pos_x = pos_y;
         let mut x_num = 0;
-        while pos_x <= end_pos_x {
+        (pos_y..=pos_y + x_positions).step_by(channels).filter_map(|pos_x| {
 
-            let screen_mean: u8 = (
-                screen_columns_sum[x_num..x_num + sample_row_len].iter()
+            let screen_sum = screen_columns_sum[x_num..x_num + sample_row_len].iter()
                 .copied()
-                .sum::<u32>() / sample_buf.len() as u32
-            ).try_into().unwrap();
+                .sum::<u32>();
+
+            let screen_mean: u8 = (screen_sum / sample_buf.len() as u32).try_into().unwrap();
+
             let delta: i16 = i16::from(screen_mean) - i16::from(sample_mean);
             let diff_sum = match_window(
                 &screen_int_buf,
@@ -138,26 +190,19 @@ pub fn find_sample(
                 area,
                 delta,
                 channels,
-                min_diff
+                threshold
             );
-            if diff_sum < min_diff {
-                min_diff = diff_sum;
-                best_idx = pos_x;
-            }
-            pos_x += channels;
             x_num += channels;
-        }
-        pos_y += screen_row_len;
-    }
+            if diff_sum <= threshold {
+                let x = (pos_x % screen_row_len / channels).try_into().unwrap();
+                let y = (pos_x / screen_row_len).try_into().unwrap();
+                Some((diff_sum, [x, y]))
+            } else {
+                None
+            }
+        }).collect::<Vec<(u32, [u16; 2])>>()
+    })
     // println!("{}", min_diff as f32 / (checked_bytes * u8::MAX as usize) as f32);  // tolerance needed for the best match
-    
-    if TOLERANCE > min_diff as f32 / (sample_int_buf.len() * u8::MAX as usize) as f32 {
-        let x = (best_idx % screen_row_len / channels).try_into().unwrap();
-        let y = (best_idx / screen_row_len).try_into().unwrap();
-        Some([x, y])
-    } else {
-        None
-    }
 }
 
 #[inline(always)]
