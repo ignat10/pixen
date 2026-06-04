@@ -88,3 +88,7 @@ pub static PNG_SAMPLE: LazyLock<Image> = LazyLock::new(|| {
 pub static PNG_NOT_SAMPLE: LazyLock<Image> = LazyLock::new(|| {
     load_from_data("not_present_sample.png")
 });
+
+pub static NTH_SCREEN: LazyLock<Image> = LazyLock::new(|| {
+    load_from_data("nth_screen.png")
+});
