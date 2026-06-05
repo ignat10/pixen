@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::env::var;
 use std::path::PathBuf;
 use std::sync::LazyLock;
@@ -13,16 +15,23 @@ static TEST_DATA: LazyLock<PathBuf> = LazyLock::new(|| {
 
 
 const SCREEN_BUFFER: &[u8] = &[
-    66,  66,  66,   66,  66,  66,   66,  66,  66,
-    66,  66,  66,    0,   0,   0,  255, 255, 255,
-    66,  66,  66,  255, 255, 255,    0,   0,   0,
-    66,  66,  66,  100, 100, 100,   50,  50,  50,
+    66,  66,  66,    66,  66,  66,    66,  66,  66,
+    66,  66,  66,     0,   1,   2,   250, 251, 252,
+    66,  66,  66,   253, 254, 255,     3,   4,   5,
+    66,  66,  66,   100, 101, 102,    50,  51,  52,
 ];
 
 const SAMPLE_BUFFER: &[u8] = &[
-    5,   5,   5, 250, 250, 250,
-    250, 250, 250,   5,   5,   5,
-    105,  95, 100,  45,  55,  50,
+      6,   7,   8,   250, 250, 250,
+    250, 250, 250,     9,  10,  11,
+    105,  95, 100,    45,  55,  50,
+];
+
+
+const DARK_SAMPLE: &[u8] = &[
+    0,0,0,
+    0,0,0,
+    0,0,0,
 ];
 
 const DIFFERENT_SAMPLE_BUFFER: &[u8] = &[
@@ -45,6 +54,16 @@ pub static SAMPLE: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
         SAMPLE_BUFFER.into(),
         2,
+        3,
+        3
+    ).unwrap()
+});
+
+
+pub static DARK: LazyLock<Image> = LazyLock::new(|| {
+    Image::new(
+        DARK_SAMPLE.into(),
+        1,
         3,
         3
     ).unwrap()
