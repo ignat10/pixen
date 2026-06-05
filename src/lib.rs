@@ -50,8 +50,7 @@ pub fn images_match(
         channels,
         sample_row_len,
         sample_row_len * sample_h,
-        0,
-        channels,
+        vec![0; channels].as_slice(),
         (TOLERANCE * (raw_sample.len() * u8::MAX as usize) as f32) as u32
     );
     TOLERANCE > diff_sum as f32 / (raw_sample.len() * u8::MAX as usize) as f32
@@ -137,6 +136,8 @@ fn match_template(
 
     let area = sample_h * screen_row_len;
 
+    let each_channel: u32 = (sample_buf.len() / channels).try_into().unwrap();
+
     let screen_int_buf: Vec<i16> = screen.buffer.iter().copied().map(i16::from).collect();
     let sample_int_buf: Vec<i16> = sample.buffer
         .chunks_exact(sample_row_len)
@@ -155,11 +156,16 @@ fn match_template(
 
     let threshold: u32 = (TOLERANCE * (sample_int_buf.len() * u8::MAX as usize) as f32).round() as u32;
 
-    let sample_mean: u8 = (sample_buf.iter().copied().map(u32::from).sum::<u32>() / sample_buf.len() as u32).try_into().unwrap();
-    let mut screen_columns_sum: Vec<u32> = Vec::with_capacity(screen_row_len);
+    let mut sample_sum: Vec<u32> = vec![0; channels];
+    for chunk in sample_buf.chunks_exact(channels) {
+        for (channel, value) in sample_sum.iter_mut().zip(chunk.iter().map(|&a| u32::from(a))) {
+            *channel += value;
+        }
+    }
+    let sample_mean: Vec<u8> = sample_sum.into_iter().map(|channel| (channel / each_channel).try_into().unwrap()).collect();
 
     (0..=y_positions).step_by(screen_row_len).flat_map(move |pos_y| {
-        screen_columns_sum = vec![0; screen_row_len];
+        let mut screen_columns_sum = vec![0; screen_row_len];
 
         let max_y = pos_y + sample_h * screen_row_len;
         let mut y = pos_y;
@@ -169,17 +175,26 @@ fn match_template(
             }
             y += screen_row_len;
         }
+        let mut window_sum: Vec<u32> = vec![0; channels];
+        for chunk in screen_columns_sum[..sample_row_len - channels].chunks_exact(channels) {
+            for (channel, &value) in window_sum.iter_mut().zip(chunk.iter()) {
+                *channel += value;
+            }
+        }
 
         let mut x_num = 0;
         (pos_y..=pos_y + x_positions).step_by(channels).filter_map(|pos_x| {
+            let end_pos = x_num + sample_row_len;
+            for (channel, &value) in window_sum.iter_mut().zip(screen_columns_sum[end_pos - channels..end_pos].iter()) {
+                *channel += value;
+            }
 
-            let screen_sum = screen_columns_sum[x_num..x_num + sample_row_len].iter()
-                .copied()
-                .sum::<u32>();
+            let window_mean: Vec<u8> = window_sum.iter().map(|&c| (c / each_channel).try_into().unwrap()).collect();
 
-            let screen_mean: u8 = (screen_sum / sample_buf.len() as u32).try_into().unwrap();
+            let delta: Vec<i16> = window_mean.iter().zip(sample_mean.iter())
+                .map(|(&a, &b)| i16::from(a) - i16::from(b))
+                .collect();
 
-            let delta: i16 = i16::from(screen_mean) - i16::from(sample_mean);
             let diff_sum = match_window(
                 &screen_int_buf,
                 &sample_int_buf,
@@ -188,11 +203,14 @@ fn match_template(
                 w_step,
                 h_step * screen_row_len,
                 area,
-                delta,
-                channels,
+                &delta,
                 threshold
             );
+            for (channel, &value) in window_sum.iter_mut().zip(screen_columns_sum[x_num..].iter()) {
+                *channel -= value;
+            }
             x_num += channels;
+
             if diff_sum <= threshold {
                 let x = (pos_x % screen_row_len / channels).try_into().unwrap();
                 let y = (pos_x / screen_row_len).try_into().unwrap();
@@ -214,8 +232,7 @@ fn match_window(
     w_step: usize,
     h_step: usize,
     area: usize,
-    delta: i16,
-    channels: usize,
+    delta: &[i16],
     min_diff: u32,
 ) -> u32 {
     let mut diff_sum = 0;
@@ -228,8 +245,8 @@ fn match_window(
         let mut idx = row;
         let max_idx = row + sample_row_len;
         while idx < max_idx {
-            for c in idx..idx + channels {
-                diff_sum += (screen[c] - sample[channel] - delta).abs() as u32;
+            for ((&scr, &smp), &dlt) in screen[idx..].iter().zip(sample[channel..].iter()).zip(delta.iter()) {
+                diff_sum += (scr - smp - dlt).abs() as u32;
                 channel += 1;
             }
             if diff_sum > min_diff {
