@@ -124,6 +124,9 @@ fn match_template(
 
     let area = sample_h * screen_row_len;
 
+    let sample_sum: u32 = sample.buffer.iter().copied().map(u32::from).sum();
+    let sample_mean = sample_sum as usize / sample.buffer.len();
+
     let screen_buf = &screen.buffer;
     let sample_buf: Vec<u8> = sample.buffer
         .chunks_exact(sample_row_len)
@@ -140,7 +143,7 @@ fn match_template(
             )
         .collect();
 
-    let threshold: u32 = (TOLERANCE * (sample_buf.len() * u8::MAX as usize) as f32).round() as u32;
+    let threshold: u32 = (TOLERANCE * (sample_mean * sample_buf.len()) as f32) as u32;
 
     (0..=y_positions).step_by(screen_row_len).flat_map(move |pos_y| {
         (pos_y..=pos_y + x_positions).step_by(channels).filter_map(|pos_x| {
