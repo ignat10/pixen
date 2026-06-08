@@ -85,29 +85,32 @@ pub fn find_nth(
     sample: &Image,
     n: usize
 ) -> Option<[u16; 2]> {
-    let w: u16 = screen.width.isqrt().try_into().unwrap();
-    let h: u16 = screen.height.isqrt().try_into().unwrap();
+    let w: u16 = sample.width.try_into().unwrap();
+    let h: u16 = sample.width.try_into().unwrap();
 
     let data = match_template(screen, sample);
     let coords: Vec<_> = data.map(|(_, coords)| coords).collect();
-    let mut coords_copy = coords.clone();
+    println!("all matched coords: {:?}", coords);
+    let mut filtered: Vec<[u16; 2]> = Vec::new();
 
-    for i in (0..coords.len()).rev() {
-        for j in 0..i {
-            if coords[i][0].abs_diff(coords[j][0]) < w
-                && coords[i][1].abs_diff(coords[j][1]) < h
+    'outer: for coord in coords {
+        for existing in &filtered {
+            if coord[0].abs_diff(existing[0]) < w
+                && coord[1].abs_diff(existing[1]) < h
             {
-                coords_copy.remove(i);
-                break;
+                continue 'outer;
             }
         }
-    }
 
-    if coords_copy.len() > n {
-        Some(coords_copy[n])
-    } else {
-        None
+        filtered.push(coord);
+        if filtered.len() > n {
+            break;
+        }
     }
+    println!("filtered coords: {:?}", filtered);
+
+
+    filtered.get(n).copied()
 }
 
 
