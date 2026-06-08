@@ -1,4 +1,4 @@
-const TOLERANCE: f32 = 0.1;
+const TOLERANCE: f32 = 0.05;
 
 
 
