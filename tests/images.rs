@@ -14,36 +14,14 @@ static TEST_DATA: LazyLock<PathBuf> = LazyLock::new(|| {
 });
 
 
-const SCREEN_BUFFER: &[u8] = &[
-    66,  66,  66,    66,  66,  66,    66,  66,  66,
-    66,  66,  66,     0,   1,   2,   250, 251, 252,
-    66,  66,  66,   253, 254, 255,     3,   4,   5,
-    66,  66,  66,   100, 101, 102,    50,  51,  52,
-];
-
-const SAMPLE_BUFFER: &[u8] = &[
-      6,   7,   8,   250, 250, 250,
-    250, 250, 250,     9,  10,  11,
-    105,  95, 100,    45,  55,  50,
-];
-
-
-const DARK_SAMPLE: &[u8] = &[
-    0,0,0,
-    0,0,0,
-    0,0,0,
-];
-
-const DIFFERENT_SAMPLE_BUFFER: &[u8] = &[
-    255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255,
-];
-
-
 pub static SCREEN: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
-        SCREEN_BUFFER.into(),
+        vec![
+            66,  66,  66,    66,  66,  66,    66,  66,  66,
+            66,  66,  66,     0,   1,   2,   250, 251, 252,
+            66,  66,  66,   253, 254, 255,     3,   4,   5,
+            66,  66,  66,   100, 101, 102,    50,  51,  52,
+        ],
         3,
         4,
         3
@@ -52,27 +30,24 @@ pub static SCREEN: LazyLock<Image> = LazyLock::new(|| {
 
 pub static SAMPLE: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
-        SAMPLE_BUFFER.into(),
+        vec![
+            6,   7,   8,   250, 250, 250,
+            250, 250, 250,     9,  10,  11,
+            105,  95, 100,    45,  55,  50,
+        ],
         2,
         3,
         3
     ).unwrap()
 });
 
-
-pub static DARK: LazyLock<Image> = LazyLock::new(|| {
-    Image::new(
-        DARK_SAMPLE.into(),
-        1,
-        3,
-        3
-    ).unwrap()
-});
-
-
 pub static DIFFERENT_SAMPLE: LazyLock<Image> = LazyLock::new(|| {
     Image::new(
-        DIFFERENT_SAMPLE_BUFFER.into(),
+        vec![
+            255, 255, 255, 255, 255, 255,
+            255, 255, 255, 255, 255, 255,
+            255, 255, 255, 255, 255, 255,
+        ],
         2,
         3,
         3
