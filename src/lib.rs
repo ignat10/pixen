@@ -37,16 +37,6 @@ pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> 
 }
 
 
-pub fn is_present(screen: &Image, sample: &Image, coords: Option<[u16; 2]>) -> bool {
-    if let Some(coords) = coords {
-        if matches_at(screen, sample, coords) {
-            return true;
-        }
-    }
-    
-    !match_template(screen, sample).is_empty()
-}
-
 pub fn find_nth(
     screen: &Image,
     sample: &Image,
