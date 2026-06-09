@@ -52,22 +52,15 @@ pub fn images_match(
         channels,
         sample_row_len,
         sample_row_len * sample_h,
-        threshold
+        threshold,
+        channels
     );
     diff_sum <= threshold
 }
 
-pub fn find_first(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
-    Some(
-        match_template(screen, sample)
-            .next()?
-            .1
-    )
-}
-
 
 pub fn find_best(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
-    let results: Vec<(u32, [u16; 2])> = match_template(screen, sample).collect();
+    let results: Vec<(u32, [u16; 2])> = match_template(screen, sample);
 
     let mut best_diff = u32::MAX;
     let mut best_coords: Option<[u16; 2]> = None;
@@ -90,7 +83,7 @@ pub fn find_nth(
     let h: u16 = sample.width.try_into().unwrap();
 
     let data = match_template(screen, sample);
-    let coords: Vec<_> = data.map(|(_, coords)| coords).collect();
+    let coords: Vec<_> = data.into_iter().map(|(_, coords)| coords).collect();
     let mut filtered: Vec<[u16; 2]> = Vec::new();
 
     'outer: for coord in coords {
@@ -115,7 +108,7 @@ pub fn find_nth(
 fn match_template(
     screen: &Image,
     sample: &Image,
-) -> impl Iterator<Item=(u32, [u16; 2])> {
+) -> Vec<(u32, [u16; 2])> {
     assert_eq!(screen.channels, sample.channels, "different number of channels. screen: {}, sample: {}", screen.channels, sample.channels);
     let screen_h = screen.height;
     let sample_h = sample.height;
@@ -154,9 +147,11 @@ fn match_template(
     let sum: u32 = sample_buf.iter().copied().map(u32::from).sum();
     let mean: f32 = (sum / sample_buf.len() as u32) as f32;
     let mut d: u32 = u32::MAX;
-    dbg!(threshold, mean);
-    (0..=y_positions).step_by(screen_row_len).flat_map(move |pos_y| {
-        (pos_y..=pos_y + x_positions).step_by(channels).filter_map(|pos_x| {
+    dbg!(threshold, mean, sample_buf.len());
+
+    let mut matches: Vec<(u32, [u16; 2])> = Vec::new();
+    for pos_y in (0..=y_positions).step_by(screen_row_len) {
+        for pos_x in (pos_y..=pos_y + x_positions).step_by(channels) {
 
             let diff_sum = match_window(
                 screen_buf,
@@ -166,22 +161,22 @@ fn match_template(
                 w_step,
                 h_step * screen_row_len,
                 area,
-                threshold
+                threshold,
+                channels
             );
             if diff_sum < d {
-                println!("diff_sum: {}, sample_buf_len: {}", diff_sum, sample_buf.len());
+                println!("diff_sum: {}", diff_sum,);
                 d = diff_sum;
             }
 
             if diff_sum <= threshold {
                 let x = (pos_x % screen_row_len / channels).try_into().unwrap();
                 let y = (pos_x / screen_row_len).try_into().unwrap();
-                Some((diff_sum, [x, y]))
-            } else {
-                None
+                matches.push((diff_sum, [x, y]));
             }
-        }).collect::<Vec<(u32, [u16; 2])>>()
-    })
+        }
+    }
+    matches
 }
 
 #[inline(always)]
@@ -194,6 +189,7 @@ fn match_window(
     h_step: usize,
     area: usize,
     min_diff: u32,
+    channels: usize
 ) -> u32 {
     let mut diff_sum = 0;
 
@@ -205,7 +201,7 @@ fn match_window(
         let mut idx = row;
         let max_idx = row + sample_row_len;
         while idx < max_idx {
-            for (&scr, &smp) in screen[idx..idx + 3].iter().zip(sample[channel..].iter()) {
+            for (&scr, &smp) in screen[idx..idx + channels].iter().zip(sample[channel..].iter()) {
                 diff_sum += u32::from(scr.abs_diff(smp));
                 channel += 1;
             }
