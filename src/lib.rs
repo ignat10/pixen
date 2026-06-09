@@ -1,8 +1,13 @@
-const TOLERANCE: f32 = 0.1;
+const TOLERANCE: f32 = 0.02;
+const THRESHOLD: u8 = 5;
 
-
-fn formula(mean: u8, len: usize) -> u32 {
-    (TOLERANCE * (mean as usize * len) as f32) as u32
+fn formula(buffer: &Vec<u8>) -> u32 {
+    let len: u32 = buffer.len() as u32;
+    let sum: u32 = buffer.iter().copied().map(u32::from).sum();
+    let mean: u8 = (sum / len).try_into().unwrap();
+    
+    let diff: u8 = (TOLERANCE * mean as f32) as u8 + THRESHOLD;
+    len * diff as u32
 }
 
 
@@ -14,7 +19,6 @@ pub fn images_match(
     let channels = screen.channels;
 
     let sample_h = sample.height;
-
     let sample_row_len = sample.row_len;
 
     let [start_x, start_y] = coords;
@@ -29,9 +33,7 @@ pub fn images_match(
     assert!(start_x <= screen.width - sample.width, "start_x = {}, screen_width = {}, sample_width = {}. start_x is too big.", start_x, screen.width, sample.width);
     assert!(start_y <= screen.height - sample.height, "start_y = {}, screen_height = {}. sample_height = {}, start_y is too_big.", start_y, screen.height, sample.height);
 
-    let sum: u32 = sample.buffer.iter().copied().map(u32::from).sum();
-    let mean: u8 = (sum as usize / sample.buffer.len()).try_into().unwrap();
-    let threshold = formula(mean, sample.buffer.len());
+    let threshold = formula(&sample.buffer);
     
     let start_row = start_x * channels;
     let raw_screen = screen.buffer
@@ -150,7 +152,7 @@ fn match_template(
             )
         .collect();
 
-    let threshold: u32 =  formula(sample_mean, sample_buf.len());
+    let threshold: u32 =  formula(&sample_buf);
 
     (0..=y_positions).step_by(screen_row_len).flat_map(move |pos_y| {
         (pos_y..=pos_y + x_positions).step_by(channels).filter_map(|pos_x| {
