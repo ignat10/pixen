@@ -154,6 +154,7 @@ fn match_template(
     let sum: u32 = sample_buf.iter().copied().map(u32::from).sum();
     let mean: f32 = (sum / sample_buf.len() as u32) as f32;
     let mut d: u32 = u32::MAX;
+    dbg!(threshold, mean);
     (0..=y_positions).step_by(screen_row_len).flat_map(move |pos_y| {
         (pos_y..=pos_y + x_positions).step_by(channels).filter_map(|pos_x| {
 
@@ -168,7 +169,7 @@ fn match_template(
                 threshold
             );
             if diff_sum < d {
-                println!("{}", (diff_sum / sample_buf.len() as u32 - THRESHOLD as u32) as f32 / mean);
+                println("diff_sum: {}, sample_buf_len: {}", diff_sum, sample_buf.len());
                 d = diff_sum;
             }
 
