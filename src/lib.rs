@@ -169,7 +169,7 @@ fn match_template(
                 threshold
             );
             if diff_sum < d {
-                println("diff_sum: {}, sample_buf_len: {}", diff_sum, sample_buf.len());
+                println!("diff_sum: {}, sample_buf_len: {}", diff_sum, sample_buf.len());
                 d = diff_sum;
             }
 
