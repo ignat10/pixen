@@ -1,5 +1,9 @@
-const TOLERANCE: f32 = 0.05;
+const TOLERANCE: f32 = 0.1;
 
+
+fn formula(mean: u8, len: usize) -> u32 {
+    (TOLERANCE * (mean as usize * len) as f32) as u32
+}
 
 
 pub fn images_match(
@@ -25,8 +29,11 @@ pub fn images_match(
     assert!(start_x <= screen.width - sample.width, "start_x = {}, screen_width = {}, sample_width = {}. start_x is too big.", start_x, screen.width, sample.width);
     assert!(start_y <= screen.height - sample.height, "start_y = {}, screen_height = {}. sample_height = {}, start_y is too_big.", start_y, screen.height, sample.height);
 
+    let sum: u32 = sample.buffer.iter().copied().map(u32::from).sum();
+    let mean: u8 = (sum as usize / sample.buffer.len()).try_into().unwrap();
+    let threshold = formula(mean, sample.buffer.len());
+    
     let start_row = start_x * channels;
-
     let raw_screen = screen.buffer
         .chunks_exact(screen.row_len)
         .skip(start_y)
@@ -43,9 +50,9 @@ pub fn images_match(
         channels,
         sample_row_len,
         sample_row_len * sample_h,
-        (TOLERANCE * (sample.buffer.len() * u8::MAX as usize) as f32) as u32
+        threshold
     );
-    TOLERANCE > diff_sum as f32 / (sample.buffer.len() * u8::MAX as usize) as f32
+    diff_sum <= threshold
 }
 
 pub fn find_first(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
@@ -125,7 +132,7 @@ fn match_template(
     let area = sample_h * screen_row_len;
 
     let sample_sum: u32 = sample.buffer.iter().copied().map(u32::from).sum();
-    let sample_mean = sample_sum as usize / sample.buffer.len();
+    let sample_mean: u8 = (sample_sum as usize / sample.buffer.len()).try_into().unwrap();
 
     let screen_buf = &screen.buffer;
     let sample_buf: Vec<u8> = sample.buffer
@@ -143,7 +150,7 @@ fn match_template(
             )
         .collect();
 
-    let threshold: u32 = (TOLERANCE * (sample_mean * sample_buf.len()) as f32) as u32;
+    let threshold: u32 =  formula(sample_mean, sample_buf.len());
 
     (0..=y_positions).step_by(screen_row_len).flat_map(move |pos_y| {
         (pos_y..=pos_y + x_positions).step_by(channels).filter_map(|pos_x| {
