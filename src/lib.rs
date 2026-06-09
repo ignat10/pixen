@@ -1,3 +1,5 @@
+use std::cmp::min_by_key;
+
 const TOLERANCE: f32 = 0.02;
 const THRESHOLD: u8 = 5;
 
@@ -14,21 +16,30 @@ fn formula(buffer: &Vec<u8>) -> u32 {
 pub fn find_best(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
     let results: Vec<(u32, [u16; 2])> = match_template(screen, sample);
 
-    let mut best_diff = u32::MAX;
-    let mut best_coords: Option<[u16; 2]> = None;
-    for (diff, coords) in results {
-        if diff < best_diff {
-            best_coords = Some(coords);
-            best_diff = diff;
+    if results.is_empty() {
+        None
+    } else {
+        let mut best_result: (u32, [u16; 2]) = (u32::MAX, [0, 0]);
+        for result in results {
+            best_result = min_by_key(best_result, result, |&(diff, _)| diff)
         }
+        Some(best_result.1)
     }
-    best_coords
+}
+
+
+pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> Option<[u16; 2]> {
+    if matches_at(screen, sample, coords) {
+        Some(coords)
+    } else {
+        find_best(screen, sample)
+    }
 }
 
 
 pub fn is_present(screen: &Image, sample: &Image, coords: Option<[u16; 2]>) -> bool {
     if let Some(coords) = coords {
-        if images_match(screen, sample, coords) { 
+        if matches_at(screen, sample, coords) {
             return true;
         }
     }
@@ -66,8 +77,16 @@ pub fn find_nth(
     filtered.get(n).copied()
 }
 
+pub fn matches_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
+    matches_at(screen, sample, coords) || matches(screen, sample)
+}
 
-fn images_match(
+pub fn matches(screen: &Image, sample: &Image) -> bool {
+    !match_template(screen, sample).is_empty()
+}
+
+
+pub fn matches_at(
     screen: &Image,
     sample: &Image,
     coords: [u16; 2]
