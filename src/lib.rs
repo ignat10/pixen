@@ -11,54 +11,6 @@ fn formula(buffer: &Vec<u8>) -> u32 {
 }
 
 
-pub fn images_match(
-    screen: &Image,
-    sample: &Image,
-    coords: [u16; 2]
-) -> bool {
-    let channels = screen.channels;
-
-    let sample_h = sample.height;
-    let sample_row_len = sample.row_len;
-
-    let [start_x, start_y] = coords;
-
-    let start_x: usize = start_x.into();
-    let start_y: usize = start_y.into();
-
-    assert_eq!(screen.channels, sample.channels, "screen channels = {}, sample channels = {}", screen.channels, sample.channels);
-    assert!(screen.width >= sample.width, "screen width = {}, sample width = {}", screen.width, sample.width);
-    assert!(screen.height >= sample.height, "screen height = {}, sample height = {}", screen.height, sample.height);
-
-    assert!(start_x <= screen.width - sample.width, "start_x = {}, screen_width = {}, sample_width = {}. start_x is too big.", start_x, screen.width, sample.width);
-    assert!(start_y <= screen.height - sample.height, "start_y = {}, screen_height = {}. sample_height = {}, start_y is too_big.", start_y, screen.height, sample.height);
-
-    let threshold = formula(&sample.buffer);
-    
-    let start_row = start_x * channels;
-    let raw_screen = screen.buffer
-        .chunks_exact(screen.row_len)
-        .skip(start_y)
-        .take(sample_h)
-        .flat_map(|row| &row[start_row..start_row + sample_row_len])
-        .copied()
-        .collect::<Vec<u8>>();
-
-    let diff_sum = match_window(
-        &raw_screen,
-        &sample.buffer,
-        0,
-        sample_row_len,
-        channels,
-        sample_row_len,
-        sample_row_len * sample_h,
-        threshold,
-        channels
-    );
-    diff_sum <= threshold
-}
-
-
 pub fn find_best(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
     let results: Vec<(u32, [u16; 2])> = match_template(screen, sample);
 
@@ -73,6 +25,16 @@ pub fn find_best(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
     best_coords
 }
 
+
+pub fn is_present(screen: &Image, sample: &Image, coords: Option<[u16; 2]>) -> bool {
+    if let Some(coords) = coords {
+        if images_match(screen, sample, coords) { 
+            return true;
+        }
+    }
+    
+    !match_template(screen, sample).is_empty()
+}
 
 pub fn find_nth(
     screen: &Image,
@@ -102,6 +64,54 @@ pub fn find_nth(
     }
 
     filtered.get(n).copied()
+}
+
+
+fn images_match(
+    screen: &Image,
+    sample: &Image,
+    coords: [u16; 2]
+) -> bool {
+    let channels = screen.channels;
+
+    let sample_h = sample.height;
+    let sample_row_len = sample.row_len;
+
+    let [start_x, start_y] = coords;
+
+    let start_x: usize = start_x.into();
+    let start_y: usize = start_y.into();
+
+    assert_eq!(screen.channels, sample.channels, "screen channels = {}, sample channels = {}", screen.channels, sample.channels);
+    assert!(screen.width >= sample.width, "screen width = {}, sample width = {}", screen.width, sample.width);
+    assert!(screen.height >= sample.height, "screen height = {}, sample height = {}", screen.height, sample.height);
+
+    assert!(start_x <= screen.width - sample.width, "start_x = {}, screen_width = {}, sample_width = {}. start_x is too big.", start_x, screen.width, sample.width);
+    assert!(start_y <= screen.height - sample.height, "start_y = {}, screen_height = {}. sample_height = {}, start_y is too_big.", start_y, screen.height, sample.height);
+
+    let threshold = formula(&sample.buffer);
+
+    let start_row = start_x * channels;
+    let raw_screen = screen.buffer
+        .chunks_exact(screen.row_len)
+        .skip(start_y)
+        .take(sample_h)
+        .flat_map(|row| &row[start_row..start_row + sample_row_len])
+        .copied()
+        .collect::<Vec<u8>>();
+
+    let diff_sum = match_window(
+        &raw_screen,
+        &sample.buffer,
+        0,
+        sample_row_len,
+        channels,
+        sample_row_len,
+        sample_row_len * sample_h,
+        threshold,
+        channels
+    );
+    diff_sum <= threshold
 }
 
 
@@ -144,10 +154,10 @@ fn match_template(
 
     let threshold: u32 =  formula(&sample_buf);
 
-    let sum: u32 = sample_buf.iter().copied().map(u32::from).sum();
-    let mean: f32 = (sum / sample_buf.len() as u32) as f32;
-    let mut d: u32 = u32::MAX;
-    dbg!(threshold, mean, sample_buf.len());
+    // let sum: u32 = sample_buf.iter().copied().map(u32::from).sum();
+    // let mean: f32 = (sum / sample_buf.len() as u32) as f32;
+    // let mut d: u32 = u32::MAX;
+    // dbg!(threshold, mean, sample_buf.len());
 
     let mut matches: Vec<(u32, [u16; 2])> = Vec::new();
     for pos_y in (0..=y_positions).step_by(screen_row_len) {
@@ -164,10 +174,6 @@ fn match_template(
                 threshold,
                 channels
             );
-            if diff_sum < d {
-                println!("diff_sum: {}", diff_sum,);
-                d = diff_sum;
-            }
 
             if diff_sum <= threshold {
                 let x = (pos_x % screen_row_len / channels).try_into().unwrap();

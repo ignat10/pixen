@@ -1,23 +1,17 @@
 pub mod images;
 
-use pixen::images_match;
+use pixen::is_present;
 
 use images::*;
 
 #[test]
 fn test_match() {
-    let result = images_match(&*SCREEN, &*SAMPLE, [1, 1]);
-    assert!(result);
-}
-
-#[test]
-fn test_not_match() {
-    let result = images_match(&*SCREEN, &*SAMPLE, [1, 0]);
-    assert!(!result);
+    assert!(is_present(&*SCREEN, &*SAMPLE, Some([1, 1])));
+    assert!(is_present(&*SCREEN, &*SAMPLE, None));
 }
 
 #[test]
 fn test_png_match() {
-    let result = images_match(&*PNG_SCREEN, &*PNG_SAMPLE, [565, 715]);
-    assert!(result);
+    assert!(is_present(&*PNG_SCREEN, &*PNG_SAMPLE, Some([565, 715])));
+    assert!(is_present(&*PNG_SCREEN, &*PNG_SAMPLE, None));
 }
