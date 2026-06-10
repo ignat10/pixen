@@ -1,7 +1,7 @@
 use std::cmp::min_by_key;
 
 const TOLERANCE: f32 = 0.02;
-const THRESHOLD: u8 = 5;
+const THRESHOLD: u8 = 10;
 
 fn formula(buffer: &Vec<u8>) -> u32 {
     let len: u32 = buffer.len() as u32;
