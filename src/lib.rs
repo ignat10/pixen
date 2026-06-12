@@ -212,7 +212,7 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
             };
             if diff_sum < m {
                 m = diff_sum;
-                c = [pos_y / screen_row_len, pos_x / channels];
+                c = [pos_x / channels, pos_y / screen_row_len];
             }
             if diff_sum <= threshold {
                 let x = (pos_x / channels).try_into().unwrap();
