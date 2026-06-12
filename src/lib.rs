@@ -212,7 +212,7 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
             };
             if diff_sum < m {
                 m = diff_sum;
-                c = [pos_x / channels, pos_y / screen_row_len];
+                c = [pos_x, pos_y];
             }
             if diff_sum <= threshold {
                 let x = (pos_x / channels).try_into().unwrap();
@@ -221,15 +221,16 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
             }
         }
     }
-    let rows = screen_buf[c[1] * screen_row_len..c[1] * screen_row_len + area].chunks_exact(screen_row_len);
+    let [pos_x, pos_y] = c;
+    let rows = screen_buf[pos_y..pos_y + area].chunks_exact(screen_row_len);
     let window = rows.step_by(h_step).flat_map(|row| {
-    row[c[0] * channels..c[0] * channels + sample_row_len]
-        .iter()
-        .copied()
-        .array_chunks::<SIMD_CHUNK_SIZE>()
+        row[pos_x..pos_x + sample_row_len]
+            .iter()
+            .copied()
+            .array_chunks::<SIMD_CHUNK_SIZE>()
     });
     let diff_sum = unsafe {
-        match_window(sample_buf.clone().into_iter(), window, 0)
+        match_window(sample_buf.clone().into_iter(), window, u32::MAX)
     };
     let l: u32 = (sample_buf.len() * 32) as u32;
     println!("expected: {}, got: {}", threshold / l, diff_sum / l);
