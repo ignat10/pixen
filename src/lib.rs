@@ -136,15 +136,16 @@ pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
         .array_chunks::<SIMD_CHUNK_SIZE>()
         .collect();
 
-    let diff_sum = match_window(
-        raw_screen.into_iter(),
-        sample
-            .buffer
-            .clone()
-            .into_iter()
-            .array_chunks::<SIMD_CHUNK_SIZE>(),
-        threshold,
-    );
+    let diff_sum = unsafe {
+        match_window(
+            raw_screen.into_iter(),
+            sample.buffer
+                .clone()
+                .into_iter()
+                .array_chunks::<SIMD_CHUNK_SIZE>(),
+            threshold,
+        )
+    };
     diff_sum <= threshold
 }
 
@@ -171,8 +172,8 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
     let x_positions = screen_row_len - sample_row_len;
     let y_positions = (screen_h - sample_h) * screen_row_len;
 
-    let w_step = f32::from(sample.width as f32).cbrt() as usize;
-    let h_step = f32::from(sample_h as f32).cbrt() as usize;
+    let h_step = sample_h.isqrt();
+    dbg!((h_step * sample_row_len) as f32 / sample.buffer.len() as f32);
 
     let area = sample_h * screen_row_len;
 
@@ -185,7 +186,6 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
             row.iter()
                 .copied()
                 .array_chunks::<SIMD_CHUNK_SIZE>()
-                .step_by(w_step)
         })
         .collect();
 
@@ -200,14 +200,15 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
                     .iter()
                     .copied()
                     .array_chunks::<SIMD_CHUNK_SIZE>()
-                    .step_by(w_step)
             });
 
             // if pos_y / screen_row_len == 715 && pos_x / channels == 565 {
             //     return vec![(0, [67, 67])];
             // }
 
-            let diff_sum = match_window(sample_buf.clone().into_iter(), window, threshold);
+            let diff_sum = unsafe {
+                match_window(sample_buf.clone().into_iter(), window, threshold)
+            };
 
             if diff_sum <= threshold {
                 let x = (pos_x / channels).try_into().unwrap();
@@ -219,8 +220,8 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
     matches
 }
 
-#[inline(always)]
-fn match_window(
+#[target_feature(enable = "avx2")]
+unsafe fn match_window(
     win1: impl Iterator<Item = [u8; SIMD_CHUNK_SIZE]>,
     win2: impl Iterator<Item = [u8; SIMD_CHUNK_SIZE]>,
     threshold: u32,

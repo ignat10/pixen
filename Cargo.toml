@@ -1,7 +1,12 @@
 [package]
 name = "pixen"
-version = "5.0.1"
+version = "5.0.2"
 edition = "2024"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
 
 [dev-dependencies]
 stb_image = "0.3.0"
