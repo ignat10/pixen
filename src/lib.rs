@@ -7,7 +7,7 @@ use std::simd::u8x32;
 
 const SIMD_CHUNK_SIZE: usize = 32;
 
-const TOLERANCE: f32 = 0.02;
+const TOLERANCE: f32 = 0.04;
 const THRESHOLD: u8 = 5;
 
 fn formula(buffer: &Vec<u8>) -> u32 {
@@ -188,7 +188,10 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
         .collect();
 
     let threshold: u32 = formula(&sample_buf.clone().into_iter().flatten().collect());
+    println!("{}", threshold);
 
+    let mut m: u32 = u32::MAX;
+    let mut c: [u16; 2] = [0, 0];
     let mut matches: Vec<(u32, [u16; 2])> = Vec::new();
     for pos_y in (0..=y_positions).step_by(screen_row_len) {
         for pos_x in (0..=x_positions).step_by(channels) {
@@ -200,14 +203,17 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
                     .array_chunks::<SIMD_CHUNK_SIZE>()
             });
 
-            // if pos_y / screen_row_len == 715 && pos_x / channels == 565 {
+            // if  == 715 &&  == 565 {
             //     return vec![(0, [67, 67])];
             // }
 
             let diff_sum = unsafe {
                 match_window(sample_buf.clone().into_iter(), window, threshold)
             };
-
+            if diff_sum < m {
+                m = diff_sum;
+                c = [(pos_y / screen_row_len) as u16, (pos_x / channels) as u16];
+            }
             if diff_sum <= threshold {
                 let x = (pos_x / channels).try_into().unwrap();
                 let y = (pos_y / screen_row_len).try_into().unwrap();
@@ -215,6 +221,18 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
             }
         }
     }
+    let rows = screen_buf[c.1 * screen_row_len..c.1 * screen_row_len + area].chunks_exact(screen_row_len);
+    let window = rows.step_by(h_step).flat_map(|row| {
+    row[c.0 * channels..c.0 * channels + sample_row_len]
+        .iter()
+        .copied()
+        .array_chunks::<SIMD_CHUNK_SIZE>()
+    });
+    let diff_sum = unsafe {
+        match_window(sample_buf.clone().into_iter(), window, 0)
+    };
+    let l: u32 = (sample_buf.len() * 32) as u32;
+    println!("expected: {}, got: {}", threshold / l, diff_sum / l);
     matches
 }
 
