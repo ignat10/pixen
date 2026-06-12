@@ -2,14 +2,13 @@
 #![feature(portable_simd)]
 
 use std::cmp::min_by_key;
-
 use std::simd::num::SimdUint;
 use std::simd::u8x32;
 
 const SIMD_CHUNK_SIZE: usize = 32;
 
 const TOLERANCE: f32 = 0.02;
-const THRESHOLD: u8 = 10;
+const THRESHOLD: u8 = 5;
 
 fn formula(buffer: &Vec<u8>) -> u32 {
     let len: u32 = buffer.len() as u32;
@@ -173,7 +172,6 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
     let y_positions = (screen_h - sample_h) * screen_row_len;
 
     let h_step = sample_h.isqrt();
-    dbg!((h_step * sample_row_len) as f32 / sample.buffer.len() as f32);
 
     let area = sample_h * screen_row_len;
 
