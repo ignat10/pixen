@@ -221,9 +221,9 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
             }
         }
     }
-    let rows = screen_buf[c.1 * screen_row_len..c.1 * screen_row_len + area].chunks_exact(screen_row_len);
+    let rows = screen_buf[c[1] * screen_row_len..c[1] * screen_row_len + area].chunks_exact(screen_row_len);
     let window = rows.step_by(h_step).flat_map(|row| {
-    row[c.0 * channels..c.0 * channels + sample_row_len]
+    row[c[0] * channels..c[0] * channels + sample_row_len]
         .iter()
         .copied()
         .array_chunks::<SIMD_CHUNK_SIZE>()
