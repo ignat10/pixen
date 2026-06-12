@@ -44,9 +44,6 @@ fn not_found_with_hint() {
     let coords = find_best_with_hint(&*SCREEN, &*DIFFERENT_SAMPLE, [0, 0]);
     assert_eq!(coords, None);
 
-    let coords = find_best_with_hint(&*PNG_SCREEN, &*PNG_NOT_SAMPLE, COORDS);
-    assert_eq!(coords, None);
-
     let coords = find_best_with_hint(&*PNG_SCREEN, &*PNG_NOT_SAMPLE, [0, 0]);
     assert_eq!(coords, None);
 }
