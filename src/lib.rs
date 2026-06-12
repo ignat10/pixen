@@ -191,7 +191,7 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
     println!("{}", threshold);
 
     let mut m: u32 = u32::MAX;
-    let mut c: [u16; 2] = [0, 0];
+    let mut c: [usize; 2] = [0, 0];
     let mut matches: Vec<(u32, [u16; 2])> = Vec::new();
     for pos_y in (0..=y_positions).step_by(screen_row_len) {
         for pos_x in (0..=x_positions).step_by(channels) {
@@ -212,7 +212,7 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
             };
             if diff_sum < m {
                 m = diff_sum;
-                c = [(pos_y / screen_row_len) as u16, (pos_x / channels) as u16];
+                c = [pos_y / screen_row_len, pos_x / channels];
             }
             if diff_sum <= threshold {
                 let x = (pos_x / channels).try_into().unwrap();
