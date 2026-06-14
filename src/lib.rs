@@ -8,7 +8,7 @@ use std::simd::u8x32;
 const SIMD_CHUNK_SIZE: usize = 32;
 
 const TOLERANCE: f32 = 0.04;
-const THRESHOLD: u8 = 8;
+const THRESHOLD: u8 = 12;
 
 fn formula(buffer: &Vec<u8>) -> u32 {
     let len: u32 = buffer.len() as u32;
