@@ -203,10 +203,6 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
                     .array_chunks::<SIMD_CHUNK_SIZE>()
             });
 
-            // if  == 715 &&  == 565 {
-            //     return vec![(0, [67, 67])];
-            // }
-
             let diff_sum = unsafe {
                 match_window(sample_buf.clone().into_iter(), window, threshold)
             };
@@ -223,11 +219,11 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
     }
     let [pos_x, pos_y] = c;
     let rows = screen_buf[pos_y..pos_y + area].chunks_exact(screen_row_len);
-    let window = rows.step_by(h_step).flat_map(|row| row[pos_x..pos_x + sample_row_len].iter().copied().array_chunks::<SIMD_CHUNK_SIZE>());
+    let window = rows.clone().step_by(h_step).flat_map(|row| row[pos_x..pos_x + sample_row_len].iter().copied().array_chunks::<SIMD_CHUNK_SIZE>());
     let diff_sum = unsafe {
         match_window(sample_buf.clone().into_iter(), window, u32::MAX)
     };
-    let window = rows.step_by(h_step).flat_map(|row| row[pos_x..pos_x + sample_row_len].iter().copied().array_chunks::<SIMD_CHUNK_SIZE>());
+    let mut window = rows.step_by(h_step).flat_map(|row| row[pos_x..pos_x + sample_row_len].iter().copied().array_chunks::<SIMD_CHUNK_SIZE>());
     let l: u32 = (sample_buf.len() * 32) as u32;
     println!("screen: {:?}", window.next().unwrap());
     println!("sample: {:?}", sample_buf[0]);
