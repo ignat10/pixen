@@ -226,7 +226,7 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
     let l: u32 = (sample_buf.len() * 32) as u32;
     println!("screen: {:?}", window.next().unwrap());
     println!("sample: {:?}", sample_buf[0]);
-    println!("expected: {}, got: {}, at ({}, {})", threshold / l, diff_sum / l, pos_x, pos_y);
+    println!("threshold: {}, expected: {}, closure: {} found: {}, at ({}, {})", threshold / l, m / l, m - threshold, diff_sum / l, pos_x / channels, pos_y / screen_row_len);
     matches
 }
 
