@@ -188,7 +188,6 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
         .collect();
 
     let threshold: u32 = formula(&sample_buf.clone().into_iter().flatten().collect());
-    println!("{}", threshold);
 
     let mut m: u32 = u32::MAX;
     let mut c: [usize; 2] = [0, 0];
@@ -227,7 +226,7 @@ fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
     let l: u32 = (sample_buf.len() * 32) as u32;
     println!("screen: {:?}", window.next().unwrap());
     println!("sample: {:?}", sample_buf[0]);
-    println!("expected: {}, got: {}", threshold / l, diff_sum / l);
+    println!("expected: {}, got: {}, at ({}, {})", threshold / l, diff_sum / l, pos_x, pos_y);
     matches
 }
 
