@@ -7,15 +7,16 @@ use std::simd::u8x32;
 
 const SIMD_CHUNK_SIZE: usize = 32;
 
-const TOLERANCE: f32 = 0.04;
-const THRESHOLD: u8 = 12;
+const TOLERANCE: f32 = 0.1;
+const THRESHOLD: u8 = 5;
 
 fn formula(buffer: &Vec<u8>) -> u32 {
     let len: u32 = buffer.len() as u32;
     let sum: u32 = buffer.iter().copied().map(u32::from).sum();
     let mean: u8 = (sum / len).try_into().unwrap();
+    let mean: f32 = (mean as f32).powf(1.2);
 
-    let diff: u8 = (TOLERANCE * mean as f32) as u8 + THRESHOLD;
+    let diff: u8 = (TOLERANCE * mean) as u8 + THRESHOLD;
     len * diff as u32
 }
 
