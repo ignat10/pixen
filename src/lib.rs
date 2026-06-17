@@ -1,7 +1,6 @@
 #![feature(iter_array_chunks)]
 #![feature(portable_simd)]
 
-use std::cmp::min_by_key;
 use std::simd::num::SimdUint;
 use std::simd::u8x32;
 
@@ -21,17 +20,10 @@ fn formula(buffer: &Vec<u8>) -> u32 {
 }
 
 pub fn find_best(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
-    let results: Vec<(u32, [u16; 2])> = match_template(screen, sample);
+    let results = MatchResult::new(screen, sample);
 
-    if results.is_empty() {
-        None
-    } else {
-        let mut best_result: (u32, [u16; 2]) = (u32::MAX, [0, 0]);
-        for result in results {
-            best_result = min_by_key(best_result, result, |&(diff, _)| diff)
-        }
-        Some(best_result.1)
-    }
+    let best = results.min_by_key(|r| r.0);
+    best.map(|b| b.1)
 }
 
 pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> Option<[u16; 2]> {
@@ -46,24 +38,27 @@ pub fn find_nth(screen: &Image, sample: &Image, n: usize) -> Option<[u16; 2]> {
     let w: u16 = sample.width.try_into().unwrap();
     let h: u16 = sample.width.try_into().unwrap();
 
-    let data = match_template(screen, sample);
-    let coords: Vec<_> = data.into_iter().map(|(_, coords)| coords).collect();
-    let mut filtered: Vec<[u16; 2]> = Vec::new();
+    let data = MatchResult::new(screen, sample);
+    let mut filtered: Vec<(u32, [u16; 2])> = Vec::new();
 
-    'outer: for coord in coords {
-        for existing in &filtered {
-            if coord[0].abs_diff(existing[0]) < w && coord[1].abs_diff(existing[1]) < h {
+    'outer: for (diff, coords) in data {
+        for (min_diff, best_coords) in filtered.iter_mut() {
+            if coords[0].abs_diff(best_coords[0]) < w && coords[1].abs_diff(best_coords[1]) < h {
+                if diff < *min_diff {
+                    *min_diff = diff;
+                    *best_coords = coords;
+                }
                 continue 'outer;
             }
         }
 
-        filtered.push(coord);
-        if filtered.len() > n {
+        filtered.push((diff, coords));
+        if filtered.len() > n && coords[1] > filtered.last().unwrap().1[1] + h {
             break;
         }
     }
 
-    filtered.get(n).copied()
+    filtered.get(n).map(|t| t.1)
 }
 
 pub fn matches_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
@@ -71,7 +66,7 @@ pub fn matches_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> bo
 }
 
 pub fn matches(screen: &Image, sample: &Image) -> bool {
-    !match_template(screen, sample).is_empty()
+    MatchResult::new(screen, sample).next().is_some()
 }
 
 pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
@@ -149,70 +144,122 @@ pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
     diff_sum <= threshold
 }
 
-fn match_template(screen: &Image, sample: &Image) -> Vec<(u32, [u16; 2])> {
-    assert_eq!(
-        screen.channels, sample.channels,
-        "different number of channels. screen: {}, sample: {}",
-        screen.channels, sample.channels
-    );
-    assert!(
-        sample.row_len >= SIMD_CHUNK_SIZE,
-        "sample width is too small. required at least {}",
-        (SIMD_CHUNK_SIZE as f32 / screen.channels as f32).ceil() as u16
-    );
 
-    let screen_h = screen.height;
-    let sample_h = sample.height;
+struct MatchResult<'a> {
+    screen_rows: Vec<&'a [u8]>,
+    sample_rows: Vec<[u8; SIMD_CHUNK_SIZE]>,
+    sample_row_len: usize,
+    sample_height: usize,
+    x_positions: usize,
+    y_positions: usize,
+    x_position: usize,
+    y_position: usize,
+    step: usize,
+    threshold: u32,
+    channels: usize,
 
-    let channels = screen.channels;
+}
 
-    let screen_row_len = screen.row_len;
-    let sample_row_len = sample.row_len;
+impl<'a> Iterator for MatchResult<'a> {
+    type Item = (u32, [u16; 2]);
 
-    let x_positions = screen_row_len - sample_row_len;
-    let y_positions = (screen_h - sample_h) * screen_row_len;
+    fn next(&mut self) -> Option<Self::Item> {
+        let channels = self.channels;
+        let threshold = self.threshold;
+        let step = self.step;
 
-    let h_step = sample_h.isqrt();
+        let x_positions = self.x_positions;
+        let y_positions = self.y_positions;
 
-    let area = sample_h * screen_row_len;
+        while self.y_position <= y_positions {
+            while self.x_position <= x_positions {
+                let start_y = self.y_position;
+                let start_x = self.x_position;
+                let end_x = self.x_position + self.sample_row_len;
 
-    let screen_buf = &screen.buffer;
-    let sample_buf: Vec<[u8; SIMD_CHUNK_SIZE]> = sample
-        .buffer
-        .chunks_exact(sample_row_len)
-        .step_by(h_step)
-        .flat_map(|row| {
-            row.iter()
-                .copied()
-                .array_chunks::<SIMD_CHUNK_SIZE>()
-        })
-        .collect();
-
-    let threshold: u32 = formula(&sample_buf.clone().into_iter().flatten().collect());
-
-    let mut matches: Vec<(u32, [u16; 2])> = Vec::new();
-    for pos_y in (0..=y_positions).step_by(screen_row_len) {
-        for pos_x in (0..=x_positions).step_by(channels) {
-            let rows = screen_buf[pos_y..pos_y + area].chunks_exact(screen_row_len);
-            let window = rows.step_by(h_step).flat_map(|row| {
-                row[pos_x..pos_x + sample_row_len]
+                let window = self.screen_rows[self.y_position..self.y_position + self.sample_height]
                     .iter()
+                    .step_by(step)
+                    .flat_map(|&row| row[start_x..end_x].iter().copied().array_chunks());
+
+                let diff_sum = unsafe {
+                    match_window(self.sample_rows.iter().copied(), window, threshold)
+                };
+
+                self.x_position += channels;
+                if diff_sum <= threshold {
+                    let x = (start_x / channels).try_into().unwrap();
+                    let y = start_y.try_into().unwrap();
+                    return Some((diff_sum, [x, y]));
+                }
+            }
+            self.y_position += 1;
+            self.x_position = 0;
+            // println!("{}", self.y_position);
+        }
+        None
+    }
+}
+
+    impl<'a> MatchResult<'a> {
+    fn new(
+        screen: &'a Image,
+        sample: &'a Image,
+    ) -> Self {
+        assert_eq!(
+            screen.channels, sample.channels,
+            "different number of channels. screen: {}, sample: {}",
+            screen.channels, sample.channels
+        );
+        assert!(
+            sample.row_len >= SIMD_CHUNK_SIZE,
+            "sample width is too small. required at least {}",
+            (SIMD_CHUNK_SIZE as f32 / screen.channels as f32).ceil() as u16
+        );
+
+        let screen_height = screen.height;
+        let sample_height = sample.height;
+
+        let channels = screen.channels;
+
+        let screen_row_len = screen.row_len;
+        let sample_row_len = sample.row_len;
+
+        let x_positions = screen_row_len - sample_row_len;
+        let y_positions = screen_height - sample_height;
+
+        let step = sample_height.isqrt();
+
+        let screen_rows: Vec<&'a [u8]> = screen.buffer
+            .chunks_exact(screen_row_len)
+            .collect();
+        let sample_rows: Vec<[u8; SIMD_CHUNK_SIZE]> = sample
+            .buffer
+            .chunks_exact(sample_row_len)
+            .step_by(step)
+            .flat_map(|row| {
+                row.iter()
                     .copied()
                     .array_chunks::<SIMD_CHUNK_SIZE>()
-            });
+            })
+            .collect();
 
-            let diff_sum = unsafe {
-                match_window(sample_buf.clone().into_iter(), window, threshold)
-            };
+        let threshold: u32 = formula(&sample_rows.clone().into_iter().flatten().collect());
 
-            if diff_sum <= threshold {
-                let x = (pos_x / channels).try_into().unwrap();
-                let y = (pos_y / screen_row_len).try_into().unwrap();
-                matches.push((diff_sum, [x, y]));
-            }
+        Self {
+            screen_rows,
+            sample_rows,
+            sample_row_len,
+            sample_height,
+            x_positions,
+            y_positions,
+            x_position: 0,
+            y_position: 0,
+            step,
+            threshold,
+            channels,
         }
     }
-    matches
 }
 
 #[target_feature(enable = "avx2")]
@@ -233,9 +280,6 @@ unsafe fn match_window(
         }
     }
 
-    // for (a, b) in chunks1.into_remainder().zip(chunks2.into_remainder()) {
-    //     diff_sum += u32::from(a.abs_diff(b));
-    // }
     diff_sum
 }
 
