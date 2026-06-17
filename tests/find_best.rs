@@ -10,6 +10,15 @@ fn found_best() {
 
     let coords = find_best(&*PNG_SCREEN, &*PNG_SAMPLE);
     assert_eq!(coords, Some(PNG_COORDS));
+
+    let coords = find_best(&*DIRT_SCREEN, &*FOOD);
+    assert_eq!(coords, Some([0, 0]));
+
+    let coords = find_best(&*BLUR_SCREEN, &*BLUR_MAP);
+    assert_eq!(coords, Some([40, 1200]));
+
+    let coords = find_best(&*BLUR_SCREEN, &*BLUR_CITY);
+    assert_eq!(coords, Some([0, 707]));
 }
 
 #[test]
@@ -18,6 +27,12 @@ fn not_found_best() {
     assert_eq!(coords, None);
 
     let coords = find_best(&*PNG_SCREEN, &*PNG_NOT_SAMPLE);
+    assert_eq!(coords, None);
+
+    let coords = find_best(&*DIRT_SCREEN, &*BLUR_MAP);
+    assert_eq!(coords, None);
+
+    let coords = find_best(&*DIRT_SCREEN, &*BLUR_CITY);
     assert_eq!(coords, None);
 }
 

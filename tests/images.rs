@@ -114,3 +114,23 @@ pub static PNG_NOT_SAMPLE: LazyLock<Image> = LazyLock::new(|| {
 pub static NTH_SCREEN: LazyLock<Image> = LazyLock::new(|| {
     load_from_data("nth_screen.png")
 });
+
+pub static BLUR_SCREEN: LazyLock<Image> = LazyLock::new(|| {
+    load_from_data("blur.png")
+});
+
+pub static BLUR_MAP: LazyLock<Image> = LazyLock::new(|| {
+    load_from_data("blur_map.png")
+});
+
+pub static BLUR_CITY: LazyLock<Image> = LazyLock::new(|| {
+    load_from_data("blur_city.png")
+});
+
+pub static DIRT_SCREEN: LazyLock<Image> = LazyLock::new(|| {
+    load_from_data("dirt.png")
+});
+
+pub static FOOD: LazyLock<Image> = LazyLock::new(|| {
+    load_from_data("food.png")
+});
