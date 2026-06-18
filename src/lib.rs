@@ -34,6 +34,13 @@ pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> 
     }
 }
 
+pub fn find_best_without_threshold(screen: &Image, sample: &Image) -> [u16; 2] {
+    MatchResult::new_without_threshold(screen, sample)
+        .min_by_key(|r| r.0)
+        .unwrap()
+        .1
+}
+
 pub fn find_nth(screen: &Image, sample: &Image, n: usize) -> Option<[u16; 2]> {
     let w: u16 = sample.width.try_into().unwrap();
     let h: u16 = sample.width.try_into().unwrap();
@@ -157,7 +164,6 @@ struct MatchResult<'a> {
     step: usize,
     threshold: u32,
     channels: usize,
-
 }
 
 impl<'a> Iterator for MatchResult<'a> {
@@ -201,10 +207,22 @@ impl<'a> Iterator for MatchResult<'a> {
     }
 }
 
-    impl<'a> MatchResult<'a> {
+impl<'a> MatchResult<'a> {
     fn new(
         screen: &'a Image,
         sample: &'a Image,
+    ) -> Self {
+        Self::base(screen, sample, formula(&sample.buffer))
+    }
+
+    fn new_without_threshold(screen: &'a Image, sample: &'a Image) -> Self {
+        Self::base(screen, sample, u32::MAX)
+    }
+
+    fn base(
+        screen: &'a Image,
+        sample: &'a Image,
+        threshold: u32,
     ) -> Self {
         assert_eq!(
             screen.channels, sample.channels,
@@ -244,8 +262,6 @@ impl<'a> Iterator for MatchResult<'a> {
             })
             .collect();
 
-        let threshold: u32 = formula(&sample_rows.clone().into_iter().flatten().collect());
-
         Self {
             screen_rows,
             sample_rows,
@@ -261,6 +277,7 @@ impl<'a> Iterator for MatchResult<'a> {
         }
     }
 }
+
 
 #[target_feature(enable = "avx2")]
 unsafe fn match_window(
