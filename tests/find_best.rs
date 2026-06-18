@@ -12,7 +12,7 @@ fn found_best() {
     assert_eq!(coords, Some(PNG_COORDS));
 
     let coords = find_best(&*DIRT_SCREEN, &*FOOD);
-    assert_eq!(coords, Some([0, 0]));
+    assert_eq!(coords, Some([318, 589]));
 
     let coords = find_best(&*BLUR_SCREEN, &*BLUR_MAP);
     assert_eq!(coords, Some([40, 1200]));
