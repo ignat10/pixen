@@ -49,6 +49,7 @@ pub fn find_best_without_threshold(screen: &Image, sample: &Image) -> (u8, [u16;
         .try_into()
         .unwrap();
 
+    println!("len: {}, diff: {}", len, result.0);
     ((result.0 / len).try_into().unwrap(), result.1)
 }
 
