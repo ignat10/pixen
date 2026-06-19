@@ -39,7 +39,16 @@ pub fn find_best_without_threshold(screen: &Image, sample: &Image) -> (u8, [u16;
         .min_by_key(|r| r.0)
         .unwrap();
 
-    let len: u32 = (sample.height * sample.row_len / SIMD_CHUNK_SIZE * SIMD_CHUNK_SIZE).try_into().unwrap();
+    let len: u32 = sample.buffer
+        .chunks_exact(sample.row_len)
+        .step_by(sample.height.isqrt())
+        .flat_map(|r| r.iter().array_chunks::<SIMD_CHUNK_SIZE>())
+        .flatten()
+        .collect::<Vec<_>>()
+        .len()
+        .try_into()
+        .unwrap();
+
     ((result.0 / len).try_into().unwrap(), result.1)
 }
 
