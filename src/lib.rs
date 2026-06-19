@@ -9,9 +9,9 @@ const SIMD_CHUNK_SIZE: usize = 32;
 const TOLERANCE: f32 = 0.0;
 const THRESHOLD: u8 = 5;
 
-fn formula(buffer: &Vec<u8>) -> u32 {
+fn formula(buffer: Vec<u8>) -> u32 {
     let len: u32 = buffer.len() as u32;
-    let sum: u32 = buffer.iter().copied().map(u32::from).sum();
+    let sum: u32 = buffer.into_iter().map(u32::from).sum();
     let mean: u8 = (sum / len).try_into().unwrap();
     let mean: f32 = (mean as f32).powf(1.1);
 
@@ -125,7 +125,7 @@ pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
         sample.height
     );
 
-    let threshold = formula(&sample.buffer);
+    let threshold = formula(sample.buffer.clone());
 
     let start_row = start_x * channels;
     let raw_screen: Vec<[u8; SIMD_CHUNK_SIZE]> = screen
@@ -207,22 +207,27 @@ impl<'a> Iterator for MatchResult<'a> {
     }
 }
 
+enum Threshold {
+    Max,
+    Formula,
+}
+
 impl<'a> MatchResult<'a> {
     fn new(
         screen: &'a Image,
         sample: &'a Image,
     ) -> Self {
-        Self::base(screen, sample, formula(&sample.buffer))
+        Self::base(screen, sample, Threshold::Formula)
     }
 
     fn new_without_threshold(screen: &'a Image, sample: &'a Image) -> Self {
-        Self::base(screen, sample, u32::MAX)
+        Self::base(screen, sample, Threshold::Max)
     }
 
     fn base(
         screen: &'a Image,
         sample: &'a Image,
-        threshold: u32,
+        threshold: Threshold,
     ) -> Self {
         assert_eq!(
             screen.channels, sample.channels,
@@ -261,6 +266,11 @@ impl<'a> MatchResult<'a> {
                     .array_chunks::<SIMD_CHUNK_SIZE>()
             })
             .collect();
+
+        let threshold = match threshold {
+            Threshold::Max => u32::MAX,
+            Threshold::Formula => formula(sample_rows.clone().into_flattened())
+        };
 
         Self {
             screen_rows,
