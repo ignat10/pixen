@@ -7,7 +7,7 @@ use std::simd::u8x32;
 const SIMD_CHUNK_SIZE: usize = 32;
 
 const TOLERANCE: f32 = 0.0;
-const THRESHOLD: u8 = 5;
+const THRESHOLD: u8 = 20;
 
 fn formula(buffer: Vec<u8>) -> u32 {
     let len: u32 = buffer.len() as u32;
@@ -26,11 +26,23 @@ pub fn find_best(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
     best.map(|b| b.1)
 }
 
+pub fn find_exact(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
+    MatchResult::exact(screen, sample).next().map(|r| r.1)
+}
+
 pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> Option<[u16; 2]> {
     if matches_at(screen, sample, coords) {
         Some(coords)
     } else {
         find_best(screen, sample)
+    }
+}
+
+pub fn find_exact_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> Option<[u16; 2]> {
+    if matches_exact(screen, sample) {
+        Some(coords)
+    } else {
+        find_exact(screen, sample)
     }
 }
 
@@ -80,15 +92,32 @@ pub fn find_nth(screen: &Image, sample: &Image, n: usize) -> Option<[u16; 2]> {
     filtered.get(n).map(|t| t.1)
 }
 
-pub fn matches_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
-    matches_at(screen, sample, coords) || matches(screen, sample)
-}
 
 pub fn matches(screen: &Image, sample: &Image) -> bool {
     MatchResult::new(screen, sample).next().is_some()
 }
 
+pub fn matches_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
+    match_at(screen, sample, coords, Threshold::Formula) || matches(screen, sample)
+}
+
 pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
+    match_at(screen, sample, coords, Threshold::Formula)
+}
+
+pub fn matches_exact(screen: &Image, sample: &Image) -> bool {
+    MatchResult::exact(screen, sample).next().is_some()
+}
+
+pub fn matches_exact_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
+    match_at(screen, sample, coords, Threshold::Min)
+}
+
+pub fn matches_exact_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
+    matches_exact_at(screen, sample, coords) || matches_exact(screen, sample)
+}
+
+fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], threshold: Threshold) -> bool {
     assert_eq!(
         screen.channels, sample.channels,
         "screen channels = {}, sample channels = {}",
@@ -137,7 +166,11 @@ pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
         sample.height
     );
 
-    let threshold = formula(sample.buffer.clone());
+    let threshold = match threshold {
+        Threshold::Min => u32::MIN,
+        Threshold::Max => u32::MAX,
+        Threshold::Formula => formula(sample.buffer.clone()),
+    };
 
     let start_row = start_x * channels;
     let raw_screen: Vec<[u8; SIMD_CHUNK_SIZE]> = screen
@@ -162,7 +195,6 @@ pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
     };
     diff_sum <= threshold
 }
-
 
 struct MatchResult<'a> {
     screen_rows: Vec<&'a [u8]>,
@@ -221,6 +253,7 @@ impl<'a> Iterator for MatchResult<'a> {
 
 enum Threshold {
     Max,
+    Min,
     Formula,
 }
 
@@ -234,6 +267,10 @@ impl<'a> MatchResult<'a> {
 
     fn new_without_threshold(screen: &'a Image, sample: &'a Image) -> Self {
         Self::base(screen, sample, Threshold::Max)
+    }
+
+    fn exact(screen: &'a Image, sample: &'a Image) -> Self {
+        Self::base(screen, sample, Threshold::Min)
     }
 
     fn base(
@@ -281,6 +318,7 @@ impl<'a> MatchResult<'a> {
 
         let threshold = match threshold {
             Threshold::Max => u32::MAX,
+            Threshold::Min => u32::MIN,
             Threshold::Formula => formula(sample_rows.clone().into_flattened())
         };
 
