@@ -34,11 +34,13 @@ pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> 
     }
 }
 
-pub fn find_best_without_threshold(screen: &Image, sample: &Image) -> [u16; 2] {
-    MatchResult::new_without_threshold(screen, sample)
+pub fn find_best_without_threshold(screen: &Image, sample: &Image) -> (u8, [u16; 2]) {
+    let result = MatchResult::new_without_threshold(screen, sample)
         .min_by_key(|r| r.0)
-        .unwrap()
-        .1
+        .unwrap();
+
+    let len: u32 = (sample.height * sample.row_len / SIMD_CHUNK_SIZE * SIMD_CHUNK_SIZE).try_into().unwrap();
+    ((result.0 / len).try_into().unwrap(), result.1)
 }
 
 pub fn find_nth(screen: &Image, sample: &Image, n: usize) -> Option<[u16; 2]> {
