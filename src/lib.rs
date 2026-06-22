@@ -6,71 +6,34 @@ use std::simd::u8x32;
 
 const SIMD_CHUNK_SIZE: usize = 32;
 
-const TOLERANCE: f32 = 0.0;
-const THRESHOLD: u8 = 20;
 
-fn formula(buffer: Vec<u8>) -> u32 {
-    let len: u32 = buffer.len() as u32;
-    let sum: u32 = buffer.into_iter().map(u32::from).sum();
-    let mean: u8 = (sum / len).try_into().unwrap();
-    let mean: f32 = (mean as f32).powf(1.1);
-
-    let diff: u8 = (TOLERANCE * mean) as u8 + THRESHOLD;
-    len * diff as u32
-}
-
-pub fn find_best(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
-    let results = MatchResult::new(screen, sample);
+pub fn find_best(screen: &Image, sample: &Image, tolerance: u8) -> Option<[u16; 2]> {
+    let results = MatchResult::new(screen, sample, tolerance);
 
     let best = results.min_by_key(|r| r.0);
     best.map(|b| b.1)
 }
 
-pub fn find_exact(screen: &Image, sample: &Image) -> Option<[u16; 2]> {
-    MatchResult::exact(screen, sample).next().map(|r| r.1)
-}
-
-pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> Option<[u16; 2]> {
-    if matches_at(screen, sample, coords) {
+pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> Option<[u16; 2]> {
+    if matches_at(screen, sample, coords, tolerance) {
         Some(coords)
     } else {
-        find_best(screen, sample)
+        find_best(screen, sample, tolerance)
     }
 }
 
-pub fn find_exact_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> Option<[u16; 2]> {
-    if matches_exact(screen, sample) {
-        Some(coords)
-    } else {
-        find_exact(screen, sample)
-    }
-}
-
-pub fn find_best_without_threshold(screen: &Image, sample: &Image) -> (u8, [u16; 2]) {
-    let result = MatchResult::new_without_threshold(screen, sample)
+pub fn get_tolerance(screen: &Image, sample: &Image) -> (u8, [u16; 2]) {
+    MatchResult::new(screen, sample, u8::MAX)
         .min_by_key(|r| r.0)
-        .unwrap();
-
-    let len: u32 = sample.buffer
-        .chunks_exact(sample.row_len)
-        .step_by(sample.height.isqrt())
-        .flat_map(|r| r.iter().array_chunks::<SIMD_CHUNK_SIZE>())
-        .flatten()
-        .collect::<Vec<_>>()
-        .len()
-        .try_into()
-        .unwrap();
-
-    println!("len: {}, diff: {}", len, result.0);
-    ((result.0 / len).try_into().unwrap(), result.1)
+        .unwrap()
 }
 
-pub fn find_nth(screen: &Image, sample: &Image, n: usize) -> Option<[u16; 2]> {
+pub fn find_nth(screen: &Image, sample: &Image, tolerance: u8, n: usize) -> Option<[u16; 2]> {
     let w: u16 = sample.width.try_into().unwrap();
     let h: u16 = sample.width.try_into().unwrap();
 
-    let data = MatchResult::new(screen, sample);
-    let mut filtered: Vec<(u32, [u16; 2])> = Vec::new();
+    let data = MatchResult::new(screen, sample, tolerance);
+    let mut filtered: Vec<(u8, [u16; 2])> = Vec::new();
 
     'outer: for (diff, coords) in data {
         for (min_diff, best_coords) in filtered.iter_mut() {
@@ -93,31 +56,19 @@ pub fn find_nth(screen: &Image, sample: &Image, n: usize) -> Option<[u16; 2]> {
 }
 
 
-pub fn matches(screen: &Image, sample: &Image) -> bool {
-    MatchResult::new(screen, sample).next().is_some()
+pub fn matches(screen: &Image, sample: &Image, tolerance: u8) -> bool {
+    MatchResult::new(screen, sample, tolerance).next().is_some()
 }
 
-pub fn matches_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
-    match_at(screen, sample, coords, Threshold::Formula) || matches(screen, sample)
+pub fn matches_with_hint(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> bool {
+    match_at(screen, sample, coords, tolerance) || matches(screen, sample, tolerance)
 }
 
-pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
-    match_at(screen, sample, coords, Threshold::Formula)
+pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> bool {
+    match_at(screen, sample, coords, tolerance)
 }
 
-pub fn matches_exact(screen: &Image, sample: &Image) -> bool {
-    MatchResult::exact(screen, sample).next().is_some()
-}
-
-pub fn matches_exact_at(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
-    match_at(screen, sample, coords, Threshold::Min)
-}
-
-pub fn matches_exact_with_hint(screen: &Image, sample: &Image, coords: [u16; 2]) -> bool {
-    matches_exact_at(screen, sample, coords) || matches_exact(screen, sample)
-}
-
-fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], threshold: Threshold) -> bool {
+fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> bool {
     assert_eq!(
         screen.channels, sample.channels,
         "screen channels = {}, sample channels = {}",
@@ -166,12 +117,6 @@ fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], threshold: Thresho
         sample.height
     );
 
-    let threshold = match threshold {
-        Threshold::Min => u32::MIN,
-        Threshold::Max => u32::MAX,
-        Threshold::Formula => formula(sample.buffer.clone()),
-    };
-
     let start_row = start_x * channels;
     let raw_screen: Vec<[u8; SIMD_CHUNK_SIZE]> = screen
         .buffer
@@ -182,6 +127,8 @@ fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], threshold: Thresho
         .copied()
         .array_chunks::<SIMD_CHUNK_SIZE>()
         .collect();
+
+    let threshold = u32::from(tolerance) * u32::try_from(sample.buffer.len()).unwrap();
 
     let diff_sum = unsafe {
         match_window(
@@ -208,10 +155,11 @@ struct MatchResult<'a> {
     step: usize,
     threshold: u32,
     channels: usize,
+    pixels: u32,
 }
 
 impl<'a> Iterator for MatchResult<'a> {
-    type Item = (u32, [u16; 2]);
+    type Item = (u8, [u16; 2]);
 
     fn next(&mut self) -> Option<Self::Item> {
         let channels = self.channels;
@@ -230,7 +178,8 @@ impl<'a> Iterator for MatchResult<'a> {
                 let window = self.screen_rows[self.y_position..self.y_position + self.sample_height]
                     .iter()
                     .step_by(step)
-                    .flat_map(|&row| row[start_x..end_x].iter().copied().array_chunks());
+                    .copied()
+                    .flat_map(|row| row[start_x..end_x].iter().copied().array_chunks());
 
                 let diff_sum = unsafe {
                     match_window(self.sample_rows.iter().copied(), window, threshold)
@@ -240,7 +189,8 @@ impl<'a> Iterator for MatchResult<'a> {
                 if diff_sum <= threshold {
                     let x = (start_x / channels).try_into().unwrap();
                     let y = start_y.try_into().unwrap();
-                    return Some((diff_sum, [x, y]));
+                    let diff = (diff_sum / self.pixels).try_into().unwrap();
+                    return Some((diff, [x, y]));
                 }
             }
             self.y_position += 1;
@@ -251,32 +201,11 @@ impl<'a> Iterator for MatchResult<'a> {
     }
 }
 
-enum Threshold {
-    Max,
-    Min,
-    Formula,
-}
-
 impl<'a> MatchResult<'a> {
     fn new(
         screen: &'a Image,
         sample: &'a Image,
-    ) -> Self {
-        Self::base(screen, sample, Threshold::Formula)
-    }
-
-    fn new_without_threshold(screen: &'a Image, sample: &'a Image) -> Self {
-        Self::base(screen, sample, Threshold::Max)
-    }
-
-    fn exact(screen: &'a Image, sample: &'a Image) -> Self {
-        Self::base(screen, sample, Threshold::Min)
-    }
-
-    fn base(
-        screen: &'a Image,
-        sample: &'a Image,
-        threshold: Threshold,
+        tolerance: u8,
     ) -> Self {
         assert_eq!(
             screen.channels, sample.channels,
@@ -315,13 +244,9 @@ impl<'a> MatchResult<'a> {
                     .array_chunks::<SIMD_CHUNK_SIZE>()
             })
             .collect();
-
-        let threshold = match threshold {
-            Threshold::Max => u32::MAX,
-            Threshold::Min => u32::MIN,
-            Threshold::Formula => formula(sample_rows.clone().into_flattened())
-        };
-
+        let pixels = u32::try_from(sample_rows.len() * SIMD_CHUNK_SIZE).unwrap();
+        let threshold = u32::from(tolerance) * pixels;
+        
         Self {
             screen_rows,
             sample_rows,
@@ -334,6 +259,7 @@ impl<'a> MatchResult<'a> {
             step,
             threshold,
             channels,
+            pixels,
         }
     }
 }
