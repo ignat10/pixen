@@ -29,6 +29,14 @@ pub fn get_tolerance(screen: &Image, sample: &Image) -> (u8, [u16; 2]) {
 }
 
 pub fn find_nth(screen: &Image, sample: &Image, tolerance: u8, n: usize) -> Option<[u16; 2]> {
+    filter(screen, sample, tolerance).get(n).map(|t| t.1)
+}
+
+pub fn count(screen: &Image, sample: &Image, tolerance: u8) -> u16 {
+    filter(screen, sample, tolerance).len().try_into().unwrap()
+}
+
+fn filter(screen: &Image, sample: &Image, tolerance: u8) -> Vec<(u8, [u16; 2])> {
     let w: u16 = sample.width.try_into().unwrap();
     let h: u16 = sample.width.try_into().unwrap();
 
@@ -45,16 +53,10 @@ pub fn find_nth(screen: &Image, sample: &Image, tolerance: u8, n: usize) -> Opti
                 continue 'outer;
             }
         }
-
         filtered.push((diff, coords));
-        if filtered.len() > n && coords[1] > filtered.last().unwrap().1[1] + h {
-            break;
-        }
     }
-
-    filtered.get(n).map(|t| t.1)
+    filtered
 }
-
 
 pub fn matches(screen: &Image, sample: &Image, tolerance: u8) -> bool {
     MatchResult::new(screen, sample, tolerance).next().is_some()
