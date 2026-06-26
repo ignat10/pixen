@@ -1,49 +1,75 @@
 #![feature(iter_array_chunks)]
 #![feature(portable_simd)]
+#![feature(alloc_slice_into_array)]
 
 use std::simd::num::SimdUint;
 use std::simd::u8x32;
 
 const SIMD_CHUNK_SIZE: usize = 32;
 
+type Point = [u16; 2];
+type Region = [Point; 2];
 
-pub fn find_best(screen: &Image, sample: &Image, tolerance: u8) -> Option<[u16; 2]> {
-    let results = MatchResult::new(screen, sample, tolerance);
+const ZERO: Point = [0, 0];
 
-    let best = results.min_by_key(|r| r.0);
-    best.map(|b| b.1)
+
+pub fn find_best(screen: &Image, sample: &Image, tolerance: u8) -> Option<Point> {
+    MatchResult::new(screen, sample, None, tolerance)
+        .unwrap()
+        .min_by_key(|r| r.0)
+        .map(|b| b.1)
 }
 
-pub fn find_best_with_hint(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> Option<[u16; 2]> {
-    if matches_at(screen, sample, coords, tolerance) {
-        Some(coords)
-    } else {
-        find_best(screen, sample, tolerance)
-    }
-}
-
-pub fn get_tolerance(screen: &Image, sample: &Image) -> (u8, [u16; 2]) {
-    MatchResult::new(screen, sample, u8::MAX)
+pub fn get_tolerance(screen: &Image, sample: &Image) -> (u8, Point) {
+    MatchResult::new(screen, sample, None, u8::MAX)
+        .unwrap()
         .min_by_key(|r| r.0)
         .unwrap()
 }
 
-pub fn find_nth(screen: &Image, sample: &Image, tolerance: u8, n: usize) -> Option<[u16; 2]> {
-    filter(screen, sample, tolerance).get(n).map(|t| t.1)
+pub fn get_region(screen: &Image, sample: &Image) -> Region {
+    let [x, y] = MatchResult::new(screen, sample, None, u8::MAX)
+        .unwrap()
+        .min_by_key(|r| r.0)
+        .unwrap()
+        .1;
+    let [w, h] = sample.dimensions();
+    [[x, y], [x + w, y + h]]
+}
+
+pub fn find_in_region(
+    screen: &Image,
+    sample: &Image,
+    region: Region,
+    tolerance: u8,
+) -> Option<Point> {
+    MatchResult::new(screen, sample, Some(region), tolerance).unwrap().min_by_key(|r| r.0).map(|r| r.1)
+}
+
+pub fn find_nth(screen: &Image, sample: &Image, tolerance: u8, n: usize) -> Option<Point> {
+    filter(screen, sample, None, tolerance).unwrap().get(n).map(|t| t.1)
+}
+
+pub fn find_nth_in_region(screen: &Image, sample: &Image, region: Region, tolerance: u8, n: usize) -> Option<Point> {
+    filter(screen, sample, Some(region), tolerance).unwrap().get(n).map(|t| t.1)
 }
 
 pub fn count(screen: &Image, sample: &Image, tolerance: u8) -> u16 {
-    filter(screen, sample, tolerance).len().try_into().unwrap()
+    filter(screen, sample, None, tolerance).unwrap().len().try_into().unwrap()
 }
 
-fn filter(screen: &Image, sample: &Image, tolerance: u8) -> Vec<(u8, [u16; 2])> {
-    let w: u16 = sample.width.try_into().unwrap();
-    let h: u16 = sample.width.try_into().unwrap();
+pub fn count_in_region(screen: &Image, sample: &Image, region: Region, tolerance: u8) -> u16 {
+    filter(screen, sample, Some(region), tolerance).unwrap().len().try_into().unwrap()
+}
 
-    let data = MatchResult::new(screen, sample, tolerance);
-    let mut filtered: Vec<(u8, [u16; 2])> = Vec::new();
+fn filter(screen: &Image, sample: &Image, region: Option<Region>, tolerance: u8) -> Result<Vec<(u8, Point)>, String> {
+    let w: u16 = sample.width;
+    let h: u16 = sample.width;
 
-    'outer: for (diff, coords) in data {
+    let data = MatchResult::new(screen, sample, region, tolerance);
+    let mut filtered: Vec<(u8, Point)> = Vec::new();
+
+    'outer: for (diff, coords) in data? {
         for (min_diff, best_coords) in filtered.iter_mut() {
             if coords[0].abs_diff(best_coords[0]) < w && coords[1].abs_diff(best_coords[1]) < h {
                 if diff < *min_diff {
@@ -55,22 +81,22 @@ fn filter(screen: &Image, sample: &Image, tolerance: u8) -> Vec<(u8, [u16; 2])> 
         }
         filtered.push((diff, coords));
     }
-    filtered
+    Ok(filtered)
 }
 
 pub fn matches(screen: &Image, sample: &Image, tolerance: u8) -> bool {
-    MatchResult::new(screen, sample, tolerance).next().is_some()
+    MatchResult::new(screen, sample, None, tolerance).unwrap().next().is_some()
 }
 
-pub fn matches_with_hint(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> bool {
-    match_at(screen, sample, coords, tolerance) || matches(screen, sample, tolerance)
-}
-
-pub fn matches_at(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> bool {
+pub fn matches_at(screen: &Image, sample: &Image, coords: Point, tolerance: u8) -> bool {
     match_at(screen, sample, coords, tolerance)
 }
 
-fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> bool {
+pub fn matches_in_region(screen: &Image, sample: &Image, region: Region, tolerance: u8) -> bool {
+    MatchResult::new(screen, sample, Some(region), tolerance).unwrap().next().is_some()
+}
+
+fn match_at(screen: &Image, sample: &Image, coords: Point, tolerance: u8) -> bool {
     assert_eq!(
         screen.channels, sample.channels,
         "screen channels = {}, sample channels = {}",
@@ -89,7 +115,7 @@ fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> 
         sample.height
     );
     assert!(
-        sample.row_len >= SIMD_CHUNK_SIZE,
+        usize::from(sample.row_len) >= SIMD_CHUNK_SIZE,
         "sample width is too small. required at least {}",
         (SIMD_CHUNK_SIZE as f32 / screen.channels as f32).ceil() as u16
     );
@@ -101,8 +127,8 @@ fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> 
 
     let [start_x, start_y] = coords;
 
-    let start_x: usize = start_x.into();
-    let start_y: usize = start_y.into();
+    let start_x = start_x;
+    let start_y = start_y;
 
     assert!(
         start_x <= screen.width - sample.width,
@@ -122,10 +148,10 @@ fn match_at(screen: &Image, sample: &Image, coords: [u16; 2], tolerance: u8) -> 
     let start_row = start_x * channels;
     let raw_screen: Vec<[u8; SIMD_CHUNK_SIZE]> = screen
         .buffer
-        .chunks_exact(screen.row_len)
-        .skip(start_y)
-        .take(sample_h)
-        .flat_map(|row| &row[start_row..start_row + sample_row_len])
+        .chunks_exact(screen.row_len.into())
+        .skip(start_y.into())
+        .take(sample_h.into())
+        .flat_map(|row| &row[start_row.into()..(start_row + sample_row_len).into()])
         .copied()
         .array_chunks::<SIMD_CHUNK_SIZE>()
         .collect();
@@ -158,10 +184,12 @@ struct MatchResult<'a> {
     threshold: u32,
     channels: usize,
     pixels: u32,
+    x: u16,
+    y: u16,
 }
 
 impl<'a> Iterator for MatchResult<'a> {
-    type Item = (u8, [u16; 2]);
+    type Item = (u8, Point);
 
     fn next(&mut self) -> Option<Self::Item> {
         let channels = self.channels;
@@ -171,26 +199,27 @@ impl<'a> Iterator for MatchResult<'a> {
         let x_positions = self.x_positions;
         let y_positions = self.y_positions;
 
+        let sample_h = self.sample_height;
+        let sample_row_len = self.sample_row_len;
+
         while self.y_position <= y_positions {
             while self.x_position <= x_positions {
-                let start_y = self.y_position;
-                let start_x = self.x_position;
-                let end_x = self.x_position + self.sample_row_len;
+                let end_x = self.x_position + sample_row_len;
 
-                let window = self.screen_rows[self.y_position..self.y_position + self.sample_height]
+                let window = self.screen_rows[self.y_position..self.y_position + sample_h]
                     .iter()
                     .step_by(step)
                     .copied()
-                    .flat_map(|row| row[start_x..end_x].iter().copied().array_chunks());
+                    .flat_map(|row| row[self.x_position..end_x].iter().copied().array_chunks());
 
                 let diff_sum = unsafe {
                     match_window(self.sample_rows.iter().copied(), window, threshold)
                 };
 
-                self.x_position += channels;
+                self.x_position += channels; // add before check
                 if diff_sum <= threshold {
-                    let x = (start_x / channels).try_into().unwrap();
-                    let y = start_y.try_into().unwrap();
+                    let x = u16::try_from(self.x_position / channels - 1).unwrap() + self.x; // - 1 because of adding before checking
+                    let y = u16::try_from(self.y_position).unwrap() + self.y;
                     let diff = (diff_sum / self.pixels).try_into().unwrap();
                     return Some((diff, [x, y]));
                 }
@@ -207,38 +236,71 @@ impl<'a> MatchResult<'a> {
     fn new(
         screen: &'a Image,
         sample: &'a Image,
+        region: Option<Region>,
         tolerance: u8,
-    ) -> Self {
-        assert_eq!(
-            screen.channels, sample.channels,
-            "different number of channels. screen: {}, sample: {}",
-            screen.channels, sample.channels
-        );
-        assert!(
-            sample.row_len >= SIMD_CHUNK_SIZE,
-            "sample width is too small. required at least {}",
-            (SIMD_CHUNK_SIZE as f32 / screen.channels as f32).ceil() as u16
-        );
+    ) -> Result<Self, String> {
+        let screen_width = screen.width;
+        let sample_width = sample.width;
 
         let screen_height = screen.height;
         let sample_height = sample.height;
 
         let channels = screen.channels;
+        let step = sample_height.isqrt().into();
 
         let screen_row_len = screen.row_len;
         let sample_row_len = sample.row_len;
 
-        let x_positions = screen_row_len - sample_row_len;
-        let y_positions = screen_height - sample_height;
+        let [x0, y0, x1, y1] = *region
+            .unwrap_or_else(|| [ZERO, screen.dimensions()])
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .into_array()
+            .unwrap();
 
-        let step = sample_height.isqrt();
+        let [w, h] = [x1 - x0, y1 - y0];
+        if w < sample_width || h < sample_height {
+            return Err(format!(
+                "Region cannot be smaller than sample. region size: {}x{} (from {}x{} to {}x{}), sample_size: {}x{}",
+                w,
+                h,
+                x0,
+                y0,
+                x1,
+                y1,
+                sample_width,
+                sample_height,
+            ))
+        }
+
+        if x1 > screen_width || y1 > screen_height {
+            return Err(format!(
+                "region is not fully inside the screen. screen: {}x{}, region: from {}x{} to {}x{}",
+                screen_width,
+                screen_height,
+                x0,
+                y0,
+                x1,
+                y1,
+            ));
+        }
+
+        let row_start = (x0 * channels).into();
+        let row_end = (x1 * channels).into();
+
+        let x_positions = (w * channels - sample_row_len).into();
+        let y_positions = (h - sample_height).into();
 
         let screen_rows: Vec<&'a [u8]> = screen.buffer
-            .chunks_exact(screen_row_len)
+            .chunks_exact(screen_row_len.into())
+            .take(y1.into())
+            .skip(y0.into())
+            .map(|row| &row[row_start..row_end])
             .collect();
         let sample_rows: Vec<[u8; SIMD_CHUNK_SIZE]> = sample
             .buffer
-            .chunks_exact(sample_row_len)
+            .chunks_exact(sample_row_len.into())
             .step_by(step)
             .flat_map(|row| {
                 row.iter()
@@ -249,20 +311,22 @@ impl<'a> MatchResult<'a> {
         let pixels = u32::try_from(sample_rows.len() * SIMD_CHUNK_SIZE).unwrap();
         let threshold = u32::from(tolerance) * pixels;
         
-        Self {
+        Ok(Self {
             screen_rows,
             sample_rows,
-            sample_row_len,
-            sample_height,
+            sample_row_len: sample_row_len.into(),
+            sample_height: sample_height.into(),
             x_positions,
             y_positions,
             x_position: 0,
             y_position: 0,
             step,
             threshold,
-            channels,
+            channels: channels.into(),
             pixels,
-        }
+            x: x0.into(),
+            y: y0.into(),
+        })
     }
 }
 
@@ -290,25 +354,26 @@ unsafe fn match_window(
 
 pub struct Image {
     pub(crate) buffer: Vec<u8>,
-    pub(crate) width: usize,
-    pub(crate) height: usize,
-    pub(crate) channels: usize,
-    pub(crate) row_len: usize,
+    pub(crate) width: u16,
+    pub(crate) height: u16,
+    pub(crate) channels: u16,
+    pub(crate) row_len: u16,
 }
 impl Image {
     pub fn new(
         buffer: Vec<u8>,
-        width: usize,
-        height: usize,
-        channels: usize,
+        width: u16,
+        height: u16,
+        channels: u16,
     ) -> Result<Image, String> {
-        if width * height * channels != buffer.len() {
+        let prod: u32 = u32::from(width) * u32::from(height) * u32::from(channels);
+        if prod != buffer.len().try_into().unwrap() {
             return Err(format!(
                 "Buffer size mismatch: expected {}×{}×{} = {} bytes, got {} bytes",
                 width,
                 height,
                 channels,
-                width * height * channels,
+                prod,
                 buffer.len()
             ));
         }
@@ -318,18 +383,21 @@ impl Image {
             width,
             height,
             channels,
-            row_len: width * channels,
+            row_len: width * u16::from(channels),
         })
     }
 
-    pub fn width(&self) -> usize {
+    pub fn width(&self) -> u16 {
         self.width
     }
-    pub fn height(&self) -> usize {
+    pub fn height(&self) -> u16 {
         self.height
     }
-    pub fn channels(&self) -> usize {
+    pub fn channels(&self) -> u16 {
         self.channels
+    }
+    pub fn dimensions(&self) -> Point {
+        [self.width, self.height]
     }
 
     pub fn as_raw(&self) -> &Vec<u8> {

@@ -1,6 +1,6 @@
 [package]
 name = "pixen"
-version = "6.1.1"
+version = "7.0.0"
 edition = "2024"
 
 [profile.release]

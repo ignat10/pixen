@@ -1,4 +1,4 @@
-use pixen::{find_best, find_best_with_hint};
+use pixen::find_best;
 
 mod images;
 use images::*;
@@ -33,32 +33,5 @@ fn not_found_best() {
     assert_eq!(coords, None);
 
     let coords = find_best(&*DIRT_SCREEN, &*BLUR_CITY, DARK_TOLERANCE);
-    assert_eq!(coords, None);
-}
-
-#[test]
-fn found_best_with_hint() {
-    let coords = find_best_with_hint(&*SCREEN, &*SAMPLE, COORDS, TOLERANCE);
-    assert_eq!(coords, Some(COORDS));
-
-    let coords = find_best_with_hint(&*SCREEN, &*SAMPLE, [0, 0], TOLERANCE);
-    assert_eq!(coords, Some(COORDS));
-
-    let coords = find_best_with_hint(&*PNG_SCREEN, &*PNG_SAMPLE, PNG_COORDS, TOLERANCE);
-    assert_eq!(coords, Some(PNG_COORDS));
-
-    let coords = find_best_with_hint(&*PNG_SCREEN, &*PNG_SAMPLE, [0, 0], TOLERANCE);
-    assert_eq!(coords, Some(PNG_COORDS));
-}
-
-#[test]
-fn not_found_with_hint() {
-    let coords = find_best_with_hint(&*SCREEN, &*DIFFERENT_SAMPLE, COORDS, TOLERANCE);
-    assert_eq!(coords, None);
-
-    let coords = find_best_with_hint(&*SCREEN, &*DIFFERENT_SAMPLE, [0, 0], TOLERANCE);
-    assert_eq!(coords, None);
-
-    let coords = find_best_with_hint(&*PNG_SCREEN, &*PNG_NOT_SAMPLE, [0, 0], TOLERANCE);
     assert_eq!(coords, None);
 }

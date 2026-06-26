@@ -94,7 +94,7 @@ fn load_from_data(p: impl AsRef<std::path::Path>) -> Image {
     let image = image::load(&path);
     match image {
         image::LoadResult::ImageU8(image) => {
-            Image::new(image.data, image.width, image.height, image.depth).unwrap()
+            Image::new(image.data, image.width.try_into().unwrap(), image.height.try_into().unwrap(), image.depth.try_into().unwrap()).unwrap()
         }
         image::LoadResult::ImageF32(_) => panic!("Invalid format {}", path.to_str().unwrap()),
         image::LoadResult::Error(e) => panic!("{}", e),

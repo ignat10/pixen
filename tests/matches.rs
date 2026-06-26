@@ -1,6 +1,6 @@
 pub mod images;
 
-use pixen::{matches, matches_at, matches_with_hint};
+use pixen::{matches, matches_at};
 
 use images::*;
 
@@ -45,29 +45,5 @@ fn not_matched_at() {
     assert!(!result);
 
     let result = matches_at(&*PNG_SCREEN, &*PNG_NOT_SAMPLE, [0, 0], TOLERANCE);
-    assert!(!result);
-}
-
-#[test]
-fn matched_with_hint() {
-    let result = matches_with_hint(&*SCREEN, &*SAMPLE, COORDS, TOLERANCE);
-    assert!(result);
-
-    let result = matches_with_hint(&*SCREEN, &*SAMPLE, [0, 0], TOLERANCE);
-    assert!(result);
-
-    let result = matches_with_hint(&*PNG_SCREEN, &*PNG_SAMPLE, PNG_COORDS, TOLERANCE);
-    assert!(result);
-
-    let result = matches_with_hint(&*PNG_SCREEN, &*PNG_SAMPLE, [0, 0], TOLERANCE);
-    assert!(result);
-}
-
-#[test]
-fn not_matched_with_hint() {
-    let result = matches_with_hint(&*SCREEN, &*DIFFERENT_SAMPLE, [0, 0], TOLERANCE);
-    assert!(!result);
-
-    let result = matches_with_hint(&*PNG_SCREEN, &*PNG_NOT_SAMPLE, [0, 0], TOLERANCE);
     assert!(!result);
 }
