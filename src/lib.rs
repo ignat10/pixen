@@ -7,8 +7,8 @@ use std::simd::u8x32;
 
 const SIMD_CHUNK_SIZE: usize = 32;
 
-type Point = [u16; 2];
-type Region = [Point; 2];
+pub type Point = [u16; 2];
+pub type Region = [Point; 2];
 
 
 pub fn find_best(screen: &Image, sample: &Image, tolerance: u8) -> Option<Point> {
