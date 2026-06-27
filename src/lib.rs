@@ -10,8 +10,6 @@ const SIMD_CHUNK_SIZE: usize = 32;
 type Point = [u16; 2];
 type Region = [Point; 2];
 
-const ZERO: Point = [0, 0];
-
 
 pub fn find_best(screen: &Image, sample: &Image, tolerance: u8) -> Option<Point> {
     MatchResult::new(screen, sample, None, tolerance)
@@ -22,6 +20,13 @@ pub fn find_best(screen: &Image, sample: &Image, tolerance: u8) -> Option<Point>
 
 pub fn get_tolerance(screen: &Image, sample: &Image) -> (u8, Point) {
     MatchResult::new(screen, sample, None, u8::MAX)
+        .unwrap()
+        .min_by_key(|r| r.0)
+        .unwrap()
+}
+
+pub fn get_tolerance_in_region(screen: &Image, sample: &Image, region: Region) -> (u8, Point) {
+    MatchResult::new(screen, sample, Some(region), u8::MAX)
         .unwrap()
         .min_by_key(|r| r.0)
         .unwrap()
@@ -252,7 +257,7 @@ impl<'a> MatchResult<'a> {
         let sample_row_len = sample.row_len;
 
         let [x0, y0, x1, y1] = *region
-            .unwrap_or_else(|| [ZERO, screen.dimensions()])
+            .unwrap_or([[0, 0], screen.dimensions()])
             .into_iter()
             .flatten()
             .collect::<Vec<_>>()
