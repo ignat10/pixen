@@ -1,7 +1,6 @@
 use pixen::find_nth;
 
-mod images;
-use images::{NTH_SCREEN, PNG_SAMPLE};
+use crate::data::*;
 
 #[test]
 fn found_nth() {

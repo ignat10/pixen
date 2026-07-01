@@ -1,7 +1,6 @@
 use pixen::find_best;
 
-mod images;
-use images::*;
+use crate::data::*;
 
 #[test]
 fn found_best() {

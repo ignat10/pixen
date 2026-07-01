@@ -1,7 +1,6 @@
 use pixen::find_in_region;
 
-mod images;
-use images::*;
+use crate::data::*;
 
 #[test]
 fn found_in_region() {

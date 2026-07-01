@@ -8,11 +8,14 @@ use stb_image::image;
 
 use pixen::Image;
 
+
 pub const TOLERANCE: u8 = 20;
 pub const DARK_TOLERANCE: u8 = 3;
 
 static TEST_DATA: LazyLock<PathBuf> = LazyLock::new(|| {
-    PathBuf::from(var("CARGO_MANIFEST_DIR").unwrap()).join("tests/data")
+    PathBuf::from(var("CARGO_MANIFEST_DIR").unwrap())
+        .join("tests")
+        .join("data")
 });
 
 

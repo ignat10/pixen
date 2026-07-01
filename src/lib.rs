@@ -41,6 +41,16 @@ pub fn get_nth_tolerance(screen: &Image, sample: &Image, n: usize) -> (u8, Point
     results[n]
 }
 
+pub fn get_nth_tolerance_in_region(screen: &Image, sample: &Image, region: Region, n: usize) -> (u8, Point) {
+    let mut results = MatchResult::new(screen, sample, Some(region), u8::MAX)
+        .unwrap()
+        .filter();
+    results.sort();
+    println!("{results:?}");
+    results[n]
+
+}
+
 pub fn get_region(screen: &Image, sample: &Image) -> Region {
     let [x, y] = MatchResult::new(screen, sample, None, u8::MAX)
         .unwrap()
