@@ -32,6 +32,15 @@ pub fn get_tolerance_in_region(screen: &Image, sample: &Image, region: Region) -
         .unwrap()
 }
 
+pub fn get_nth_tolerance(screen: &Image, sample: &Image, n: usize) -> (u8, Point) {
+    let mut results = MatchResult::new(screen, sample, None, u8::MAX)
+        .unwrap()
+        .filter();
+    results.sort();
+
+    results[n]
+}
+
 pub fn get_region(screen: &Image, sample: &Image) -> Region {
     let [x, y] = MatchResult::new(screen, sample, None, u8::MAX)
         .unwrap()
@@ -52,41 +61,24 @@ pub fn find_in_region(
 }
 
 pub fn find_nth(screen: &Image, sample: &Image, tolerance: u8, n: usize) -> Option<Point> {
-    filter(screen, sample, None, tolerance).unwrap().get(n).map(|t| t.1)
+    MatchResult::new(screen, sample, None, tolerance)
+        .ok()
+        ?
+        .filter()
+        .get(n)
+        .map(|t| t.1)
 }
 
 pub fn find_nth_in_region(screen: &Image, sample: &Image, region: Region, tolerance: u8, n: usize) -> Option<Point> {
-    filter(screen, sample, Some(region), tolerance).unwrap().get(n).map(|t| t.1)
+    MatchResult::new(screen, sample, Some(region), tolerance).unwrap().filter().get(n).map(|t| t.1)
 }
 
-pub fn count(screen: &Image, sample: &Image, tolerance: u8) -> u16 {
-    filter(screen, sample, None, tolerance).unwrap().len().try_into().unwrap()
+pub fn count(screen: &Image, sample: &Image, tolerance: u8) -> usize {
+    MatchResult::new(screen, sample, None, tolerance).unwrap().filter().len()
 }
 
-pub fn count_in_region(screen: &Image, sample: &Image, region: Region, tolerance: u8) -> u16 {
-    filter(screen, sample, Some(region), tolerance).unwrap().len().try_into().unwrap()
-}
-
-fn filter(screen: &Image, sample: &Image, region: Option<Region>, tolerance: u8) -> Result<Vec<(u8, Point)>, String> {
-    let w: u16 = sample.width;
-    let h: u16 = sample.width;
-
-    let data = MatchResult::new(screen, sample, region, tolerance);
-    let mut filtered: Vec<(u8, Point)> = Vec::new();
-
-    'outer: for (diff, coords) in data? {
-        for (min_diff, best_coords) in filtered.iter_mut() {
-            if coords[0].abs_diff(best_coords[0]) < w && coords[1].abs_diff(best_coords[1]) < h {
-                if diff < *min_diff {
-                    *min_diff = diff;
-                    *best_coords = coords;
-                }
-                continue 'outer;
-            }
-        }
-        filtered.push((diff, coords));
-    }
-    Ok(filtered)
+pub fn count_in_region(screen: &Image, sample: &Image, region: Region, tolerance: u8) -> usize {
+    MatchResult::new(screen, sample, Some(region), tolerance).unwrap().filter().len()
 }
 
 pub fn matches(screen: &Image, sample: &Image, tolerance: u8) -> bool {
@@ -332,6 +324,26 @@ impl<'a> MatchResult<'a> {
             x: x0.into(),
             y: y0.into(),
         })
+    }
+
+    fn filter(self) -> Vec<(u8, Point)> {
+        let w = (self.sample_row_len / self.channels).try_into().unwrap();
+        let h = self.sample_height.try_into().unwrap();
+
+        let mut filtered: Vec<(u8, Point)> = Vec::new();
+        'outer: for (diff, coords) in self {
+            for (min_diff, best_coords) in filtered.iter_mut() {
+                if coords[0].abs_diff(best_coords[0]) < w && coords[1].abs_diff(best_coords[1]) < h {
+                    if diff < *min_diff {
+                        *min_diff = diff;
+                        *best_coords = coords;
+                    }
+                    continue 'outer;
+                }
+            }
+            filtered.push((diff, coords));
+        }
+        filtered
     }
 }
 
