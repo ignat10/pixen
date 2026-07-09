@@ -6,6 +6,7 @@ use std::simd::num::SimdUint;
 use std::simd::u8x32;
 
 const SIMD_CHUNK_SIZE: usize = 32;
+type SimdChunk = [u8; SIMD_CHUNK_SIZE];
 
 pub type Point = [u16; 2];
 pub type Region = [Point; 2];
@@ -103,6 +104,15 @@ pub fn matches_in_region(screen: &Image, sample: &Image, region: Region, toleran
     MatchResult::new(screen, sample, Some(region), tolerance).unwrap().next().is_some()
 }
 
+pub fn debug_match(screen: &Image, sample: &Image, point: Point) -> SimdChunk {
+    let start = usize::from(screen.row_len) * usize::from(point[1]) + usize::from(point[0]) * usize::from(screen.channels);
+    u8x32::from_array(
+        screen.buffer[start..start + SIMD_CHUNK_SIZE].try_into().unwrap()
+    ).abs_diff(
+        u8x32::from_array(sample.buffer.first_chunk::<SIMD_CHUNK_SIZE>().unwrap().to_owned())
+    ).to_array()
+}
+
 fn match_at(screen: &Image, sample: &Image, coords: Point, tolerance: u8) -> bool {
     assert_eq!(
         screen.channels, sample.channels,
@@ -153,7 +163,7 @@ fn match_at(screen: &Image, sample: &Image, coords: Point, tolerance: u8) -> boo
     );
 
     let start_row = start_x * channels;
-    let raw_screen: Vec<[u8; SIMD_CHUNK_SIZE]> = screen
+    let raw_screen: Vec<SimdChunk> = screen
         .buffer
         .chunks_exact(screen.row_len.into())
         .skip(start_y.into())
@@ -180,7 +190,7 @@ fn match_at(screen: &Image, sample: &Image, coords: Point, tolerance: u8) -> boo
 
 struct MatchResult<'a> {
     screen_rows: Vec<&'a [u8]>,
-    sample_rows: Vec<[u8; SIMD_CHUNK_SIZE]>,
+    sample_rows: Vec<SimdChunk>,
     sample_row_len: usize,
     sample_height: usize,
     x_positions: usize,
@@ -305,7 +315,7 @@ impl<'a> MatchResult<'a> {
             .skip(y0.into())
             .map(|row| &row[row_start..row_end])
             .collect();
-        let sample_rows: Vec<[u8; SIMD_CHUNK_SIZE]> = sample
+        let sample_rows: Vec<SimdChunk> = sample
             .buffer
             .chunks_exact(sample_row_len.into())
             .step_by(step)
@@ -360,8 +370,8 @@ impl<'a> MatchResult<'a> {
 
 #[target_feature(enable = "avx2")]
 unsafe fn match_window(
-    win1: impl Iterator<Item = [u8; SIMD_CHUNK_SIZE]>,
-    win2: impl Iterator<Item = [u8; SIMD_CHUNK_SIZE]>,
+    win1: impl Iterator<Item = SimdChunk>,
+    win2: impl Iterator<Item = SimdChunk>,
     threshold: u32,
 ) -> u32 {
     let mut diff_sum = 0;
