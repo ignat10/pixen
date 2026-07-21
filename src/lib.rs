@@ -92,6 +92,14 @@ pub fn count_in_region(screen: &Image, sample: &Image, region: Region, tolerance
     MatchResult::new(screen, sample, Some(region), tolerance).unwrap().filter().len()
 }
 
+pub fn find_all(screen: &Image, sample: &Image, tolerance: u8) -> Vec<Point> {
+    MatchResult::new(screen, sample, None, tolerance).unwrap().filter().into_iter().map(|r| r.1).collect()
+}
+
+pub fn find_all_in_region(screen: &Image, sample: &Image, region: Region, tolerance: u8) -> Vec<Point> {
+    MatchResult::new(screen, sample, Some(region), tolerance).unwrap().filter().into_iter().map(|r| r.1).collect()
+}
+
 pub fn matches(screen: &Image, sample: &Image, tolerance: u8) -> bool {
     MatchResult::new(screen, sample, None, tolerance).unwrap().next().is_some()
 }
@@ -250,6 +258,11 @@ impl<'a> Iterator for MatchResult<'a> {
 }
 
 impl<'a> MatchResult<'a> {
+    /// Creates a new match iterator.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected region is not fully inside the screen.
     fn new(
         screen: &'a Image,
         sample: &'a Image,
